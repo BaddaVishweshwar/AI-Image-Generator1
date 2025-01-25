@@ -2,12 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import * as fal from "@fal-ai/serverless-client";
 
-// Define the type for the API response
-interface FalImageResponse {
-  images: Array<{
-    url: string;
+interface StableDiffusionResponse {
+  artifacts: Array<{
+    base64: string;
   }>;
 }
 
@@ -24,31 +22,45 @@ const ImageGenerator = () => {
     }
 
     if (!apiKey) {
-      toast.error("Please enter your fal.ai API key");
+      toast.error("Please enter your Stable Diffusion API key");
       return;
     }
 
     setIsLoading(true);
     try {
-      // Configure fal client with API key
-      fal.config({
-        credentials: apiKey,
-      });
+      const response = await fetch(
+        "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            text_prompts: [
+              {
+                text: prompt,
+                weight: 1,
+              },
+            ],
+            cfg_scale: 7,
+            height: 1024,
+            width: 1024,
+            steps: 50,
+            samples: 1,
+          }),
+        }
+      );
 
-      const result = await fal.run('fal-ai/fast-sdxl', {
-        input: {
-          prompt,
-          image_size: "square_hd",
-          num_inference_steps: 50
-        },
-      }) as FalImageResponse;
-
-      if (result.images?.[0]) {
-        setImageUrl(result.images[0].url);
-        toast.success("Image generated successfully!");
-      } else {
-        throw new Error("No image was generated");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const result = (await response.json()) as StableDiffusionResponse;
+      const base64Image = result.artifacts[0].base64;
+      setImageUrl(`data:image/png;base64,${base64Image}`);
+      toast.success("Image generated successfully!");
     } catch (error) {
       console.error("Error generating image:", error);
       toast.error("Failed to generate image. Please check your API key and try again.");
@@ -62,14 +74,14 @@ const ImageGenerator = () => {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">AI Image Generator</h2>
         <p className="text-muted-foreground">
-          Enter your fal.ai API key and a prompt to generate an image
+          Enter your Stability AI API key and a prompt to generate an image
         </p>
       </div>
 
       <div className="space-y-4">
         <Input
           type="password"
-          placeholder="Enter your fal.ai API key"
+          placeholder="Enter your Stability AI API key"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           className="w-full"

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RunwareService } from "@/lib/runware";
 import { toast } from "sonner";
+import * as fal from "@fal-ai/serverless-client";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -17,21 +17,34 @@ const ImageGenerator = () => {
     }
 
     if (!apiKey) {
-      toast.error("Please enter your Runware API key");
+      toast.error("Please enter your fal.ai API key");
       return;
     }
 
     setIsLoading(true);
     try {
-      const runware = new RunwareService(apiKey);
-      const result = await runware.generateImage({
-        positivePrompt: prompt,
+      // Configure fal client with API key
+      fal.config({
+        credentials: apiKey,
       });
-      setImageUrl(result.imageURL);
-      toast.success("Image generated successfully!");
+
+      const result = await fal.run('fal-ai/fast-sdxl', {
+        input: {
+          prompt,
+          image_size: "square_hd",
+          num_inference_steps: 50
+        },
+      });
+
+      if (result.images?.[0]) {
+        setImageUrl(result.images[0].url);
+        toast.success("Image generated successfully!");
+      } else {
+        throw new Error("No image was generated");
+      }
     } catch (error) {
       console.error("Error generating image:", error);
-      toast.error("Failed to generate image. Please try again.");
+      toast.error("Failed to generate image. Please check your API key and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -42,14 +55,14 @@ const ImageGenerator = () => {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">AI Image Generator</h2>
         <p className="text-muted-foreground">
-          Enter your Runware API key and a prompt to generate an image
+          Enter your fal.ai API key and a prompt to generate an image
         </p>
       </div>
 
       <div className="space-y-4">
         <Input
           type="password"
-          placeholder="Enter your Runware API key"
+          placeholder="Enter your fal.ai API key"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           className="w-full"

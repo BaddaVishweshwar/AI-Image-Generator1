@@ -1,17 +1,11 @@
-import Navbar from "@/components/landing/Navbar";
-import Hero from "@/components/landing/Hero";
-import Features from "@/components/landing/Features";
-import Footer from "@/components/landing/Footer";
+import ImageGenerator from "@/components/ImageGenerator";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main>
-        <Hero />
-        <Features />
+      <main className="container mx-auto py-12">
+        <ImageGenerator />
       </main>
-      <Footer />
     </div>
   );
 };

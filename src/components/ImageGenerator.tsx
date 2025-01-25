@@ -4,6 +4,13 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import * as fal from "@fal-ai/serverless-client";
 
+// Define the type for the API response
+interface FalImageResponse {
+  images: Array<{
+    url: string;
+  }>;
+}
+
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -34,7 +41,7 @@ const ImageGenerator = () => {
           image_size: "square_hd",
           num_inference_steps: 50
         },
-      });
+      }) as FalImageResponse;
 
       if (result.images?.[0]) {
         setImageUrl(result.images[0].url);

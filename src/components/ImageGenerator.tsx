@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -15,6 +15,21 @@ const ImageGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
 
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem("stability_api_key");
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
+
+  // Save API key to localStorage when it changes
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newApiKey = e.target.value;
+    setApiKey(newApiKey);
+    localStorage.setItem("stability_api_key", newApiKey);
+  };
+
   const handleGenerate = async () => {
     if (!prompt) {
       toast.error("Please enter a prompt");
@@ -22,7 +37,7 @@ const ImageGenerator = () => {
     }
 
     if (!apiKey) {
-      toast.error("Please enter your Stable Diffusion API key");
+      toast.error("Please enter your Stability AI API key");
       return;
     }
 
@@ -83,7 +98,7 @@ const ImageGenerator = () => {
           type="password"
           placeholder="Enter your Stability AI API key"
           value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
+          onChange={handleApiKeyChange}
           className="w-full"
         />
         

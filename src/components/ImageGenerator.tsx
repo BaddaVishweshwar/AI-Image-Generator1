@@ -13,12 +13,10 @@ const ImageGenerator = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -41,39 +39,18 @@ const ImageGenerator = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${process.env.STABILITY_API_KEY}`,
-          },
-          body: JSON.stringify({
-            text_prompts: [
-              {
-                text: prompt,
-                weight: 1,
-              },
-            ],
-            cfg_scale: 7,
-            height: 1024,
-            width: 1024,
-            steps: 50,
-            samples: 1,
-          }),
-        }
-      );
+      // Call Supabase Edge Function to generate image
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt }
+      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) throw error;
+
+      if (!data?.imageUrl) {
+        throw new Error('No image was generated');
       }
 
-      const result = await response.json();
-      const base64Image = result.artifacts[0].base64;
-      const imageDataUrl = `data:image/png;base64,${base64Image}`;
-      setImageUrl(imageDataUrl);
+      setImageUrl(data.imageUrl);
 
       // Get the user's profile
       const { data: profiles } = await supabase
@@ -89,16 +66,16 @@ const ImageGenerator = () => {
       // Store the image in Supabase
       const { error: insertError } = await supabase.from("images").insert({
         prompt,
-        image_url: imageDataUrl,
+        image_url: data.imageUrl,
         profile_id: profiles.id,
       });
 
       if (insertError) throw insertError;
 
       toast.success("Image generated and saved successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating image:", error);
-      toast.error("Failed to generate image. Please try again.");
+      toast.error(error.message || "Failed to generate image. Please try again.");
     } finally {
       setIsLoading(false);
     }

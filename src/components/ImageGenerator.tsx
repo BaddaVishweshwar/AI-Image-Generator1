@@ -2,42 +2,40 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-
-interface StableDiffusionResponse {
-  artifacts: Array<{
-    base64: string;
-  }>;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState("");
+  const [session, setSession] = useState<any>(null);
+  const navigate = useNavigate();
 
-  // Load API key from localStorage on component mount
   useEffect(() => {
-    const savedApiKey = localStorage.getItem("stability_api_key");
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Save API key to localStorage when it changes
-  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newApiKey = e.target.value;
-    setApiKey(newApiKey);
-    localStorage.setItem("stability_api_key", newApiKey);
-  };
-
   const handleGenerate = async () => {
-    if (!prompt) {
-      toast.error("Please enter a prompt");
+    if (!session) {
+      toast.error("Please log in to generate images");
       return;
     }
 
-    if (!apiKey) {
-      toast.error("Please enter your Stability AI API key");
+    if (!prompt) {
+      toast.error("Please enter a prompt");
       return;
     }
 
@@ -50,7 +48,7 @@ const ImageGenerator = () => {
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${process.env.STABILITY_API_KEY}`,
           },
           body: JSON.stringify({
             text_prompts: [
@@ -72,36 +70,64 @@ const ImageGenerator = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = (await response.json()) as StableDiffusionResponse;
+      const result = await response.json();
       const base64Image = result.artifacts[0].base64;
-      setImageUrl(`data:image/png;base64,${base64Image}`);
-      toast.success("Image generated successfully!");
+      const imageDataUrl = `data:image/png;base64,${base64Image}`;
+      setImageUrl(imageDataUrl);
+
+      // Get the user's profile
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (!profiles?.id) {
+        throw new Error("Profile not found");
+      }
+
+      // Store the image in Supabase
+      const { error: insertError } = await supabase.from("images").insert({
+        prompt,
+        image_url: imageDataUrl,
+        profile_id: profiles.id,
+      });
+
+      if (insertError) throw insertError;
+
+      toast.success("Image generated and saved successfully!");
     } catch (error) {
       console.error("Error generating image:", error);
-      toast.error("Failed to generate image. Please check your API key and try again.");
+      toast.error("Failed to generate image. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!session) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Please Log In</h2>
+          <p className="text-muted-foreground mb-4">
+            You need to be logged in to generate images
+          </p>
+          <Button onClick={() => navigate("/auth")}>Log In</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">AI Image Generator</h2>
         <p className="text-muted-foreground">
-          Enter your Stability AI API key and a prompt to generate an image
+          Enter a prompt to generate an image using Stability AI
         </p>
       </div>
 
       <div className="space-y-4">
-        <Input
-          type="password"
-          placeholder="Enter your Stability AI API key"
-          value={apiKey}
-          onChange={handleApiKeyChange}
-          className="w-full"
-        />
-        
         <div className="flex gap-2">
           <Input
             placeholder="Enter your prompt..."
@@ -117,11 +143,7 @@ const ImageGenerator = () => {
 
       {imageUrl && (
         <div className="rounded-lg overflow-hidden border">
-          <img
-            src={imageUrl}
-            alt={prompt}
-            className="w-full h-auto"
-          />
+          <img src={imageUrl} alt={prompt} className="w-full h-auto" />
         </div>
       )}
     </div>

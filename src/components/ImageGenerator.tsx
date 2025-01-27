@@ -87,11 +87,10 @@ const ImageGenerator = () => {
     } catch (error: any) {
       console.error("Error generating image:", error);
       
-      // Handle specific error messages
       if (error.message.includes('429')) {
-        toast.error("Please wait a minute before generating another image. We limit the number of requests to ensure fair usage.");
+        toast.error("Please wait 2 minutes before generating another image. This helps ensure fair usage for everyone.");
       } else if (error.message.includes('busy')) {
-        toast.error("The image generation service is currently busy. Please try again in a few minutes.");
+        toast.error("The AI service is currently busy. Please try again in a few minutes.");
       } else {
         toast.error(error.message || "Failed to generate image. Please try again.");
       }

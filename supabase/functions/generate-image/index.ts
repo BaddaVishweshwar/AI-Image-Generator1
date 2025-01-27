@@ -5,9 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Adjusted rate limiting parameters
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 10; // Increased to 10 requests per minute
+// Enhanced rate limiting parameters
+const RATE_LIMIT_WINDOW = 120000; // 2 minutes
+const MAX_REQUESTS_PER_WINDOW = 3; // 3 requests per 2 minutes
 const requestLog = new Map<string, number[]>();
 
 function isRateLimited(clientId: string): boolean {
@@ -48,23 +48,27 @@ serve(async (req) => {
     }
 
     const clientId = req.headers.get('x-real-ip') || 'default';
-    console.log('Request from client:', clientId);
+    console.log(`Processing request from client: ${clientId} at ${new Date().toISOString()}`);
 
     if (isRateLimited(clientId)) {
-      console.log('Rate limit exceeded for client:', clientId);
+      console.log(`Rate limit exceeded for client: ${clientId}`);
       return new Response(
         JSON.stringify({ 
-          error: 'Rate limit exceeded. Please wait a minute before trying again.' 
+          error: 'Rate limit exceeded. Please wait 2 minutes between requests to ensure fair usage.' 
         }),
         { 
           status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '120'
+          } 
         }
       );
     }
 
     logRequest(clientId);
-    console.log('Generating image for prompt:', prompt);
+    console.log(`Generating image for prompt: "${prompt}"`);
 
     const response = await fetch(
       "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
@@ -85,7 +89,7 @@ serve(async (req) => {
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 30, // Reduced from 50 to help with rate limiting
+          steps: 25, // Reduced steps for faster generation
           samples: 1,
         }),
       }
@@ -99,11 +103,10 @@ serve(async (req) => {
         errorData
       });
 
-      // Handle Stability AI rate limits specifically
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ 
-            error: 'The image generation service is currently busy. Please try again in a few minutes.' 
+            error: 'The AI service is currently busy. Please try again in a few minutes.' 
           }),
           { 
             status: 429,
@@ -128,7 +131,7 @@ serve(async (req) => {
     console.error('Error in generate-image function:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to generate image. Please try again later.' 
+        error: 'Failed to generate image. Please try again in a few minutes.' 
       }),
       { 
         status: 500,

@@ -39,7 +39,6 @@ const ImageGenerator = () => {
 
     setIsLoading(true);
     try {
-      // Call Supabase Edge Function to generate image
       const { data, error: functionError } = await supabase.functions.invoke('generate-image', {
         body: { prompt }
       });
@@ -90,7 +89,9 @@ const ImageGenerator = () => {
       
       // Handle specific error messages
       if (error.message.includes('429')) {
-        toast.error("You've reached the rate limit. Please wait a minute before trying again.");
+        toast.error("Please wait a minute before generating another image. We limit the number of requests to ensure fair usage.");
+      } else if (error.message.includes('busy')) {
+        toast.error("The image generation service is currently busy. Please try again in a few minutes.");
       } else {
         toast.error(error.message || "Failed to generate image. Please try again.");
       }

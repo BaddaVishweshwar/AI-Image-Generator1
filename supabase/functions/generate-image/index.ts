@@ -5,9 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Simple in-memory rate limiting
+// Adjusted rate limiting parameters
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 5; // 5 requests per minute
+const MAX_REQUESTS_PER_WINDOW = 10; // Increased to 10 requests per minute
 const requestLog = new Map<string, number[]>();
 
 function isRateLimited(clientId: string): boolean {
@@ -19,9 +19,7 @@ function isRateLimited(clientId: string): boolean {
     now - timestamp < RATE_LIMIT_WINDOW
   );
   
-  // Update request log
   requestLog.set(clientId, recentRequests);
-  
   return recentRequests.length >= MAX_REQUESTS_PER_WINDOW;
 }
 
@@ -34,18 +32,26 @@ function logRequest(clientId: string) {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { prompt } = await req.json()
-    
-    // Get client IP or some identifier for rate limiting
-    const clientId = req.headers.get('x-real-ip') || 'default';
+    const { prompt } = await req.json();
+    if (!prompt) {
+      return new Response(
+        JSON.stringify({ error: 'Prompt is required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
-    // Check rate limit
+    const clientId = req.headers.get('x-real-ip') || 'default';
+    console.log('Request from client:', clientId);
+
     if (isRateLimited(clientId)) {
-      console.error('Rate limit exceeded for client:', clientId);
+      console.log('Rate limit exceeded for client:', clientId);
       return new Response(
         JSON.stringify({ 
           error: 'Rate limit exceeded. Please wait a minute before trying again.' 
@@ -54,13 +60,12 @@ serve(async (req) => {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
 
-    // Log the request
     logRequest(clientId);
-    
     console.log('Generating image for prompt:', prompt);
+
     const response = await fetch(
       "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
       {
@@ -80,11 +85,11 @@ serve(async (req) => {
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 50,
+          steps: 30, // Reduced from 50 to help with rate limiting
           samples: 1,
         }),
       }
-    )
+    );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
@@ -94,30 +99,31 @@ serve(async (req) => {
         errorData
       });
 
+      // Handle Stability AI rate limits specifically
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ 
-            error: 'Service is currently busy. Please try again in a few minutes.' 
+            error: 'The image generation service is currently busy. Please try again in a few minutes.' 
           }),
           { 
             status: 429,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
-        )
+        );
       }
 
       throw new Error(`Stability AI API error: ${response.statusText}`);
     }
 
-    const result = await response.json()
-    const base64Image = result.artifacts[0].base64
-    const imageUrl = `data:image/png;base64,${base64Image}`
+    const result = await response.json();
+    const base64Image = result.artifacts[0].base64;
+    const imageUrl = `data:image/png;base64,${base64Image}`;
 
     console.log('Successfully generated image');
     return new Response(
       JSON.stringify({ imageUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
     console.error('Error in generate-image function:', error);
     return new Response(
@@ -128,6 +134,6 @@ serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    )
+    );
   }
-})
+});

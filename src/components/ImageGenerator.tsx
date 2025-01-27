@@ -52,22 +52,24 @@ const ImageGenerator = () => {
 
       setImageUrl(data.imageUrl);
 
-      // Get the user's profile
-      const { data: profiles } = await supabase
+      // Get the user's profile using maybeSingle() instead of single()
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id")
         .eq("user_id", session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (!profiles?.id) {
-        throw new Error("Profile not found");
+      if (profileError) throw profileError;
+
+      if (!profile?.id) {
+        throw new Error("Profile not found. Please try logging out and back in.");
       }
 
       // Store the image in Supabase
       const { error: insertError } = await supabase.from("images").insert({
         prompt,
         image_url: data.imageUrl,
-        profile_id: profiles.id,
+        profile_id: profile.id,
       });
 
       if (insertError) throw insertError;

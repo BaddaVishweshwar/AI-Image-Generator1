@@ -7,8 +7,12 @@ const corsHeaders = {
 
 // Enhanced rate limiting parameters
 const RATE_LIMIT_WINDOW = 120000; // 2 minutes
-const MAX_REQUESTS_PER_WINDOW = 3; // 3 requests per 2 minutes
+const MAX_REQUESTS_PER_WINDOW = 2; // Reduced to 2 requests per 2 minutes
 const requestLog = new Map<string, number[]>();
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 function isRateLimited(clientId: string): boolean {
   const now = Date.now();
@@ -29,8 +33,67 @@ function logRequest(clientId: string) {
   requestLog.set(clientId, clientRequests);
 }
 
+async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Response> {
+  try {
+    console.log(`Attempt ${retryCount + 1} to generate image for prompt: "${prompt}"`);
+    
+    const response = await fetch(
+      "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
+        },
+        body: JSON.stringify({
+          text_prompts: [
+            {
+              text: prompt,
+              weight: 1,
+            },
+          ],
+          cfg_scale: 7,
+          height: 1024,
+          width: 1024,
+          steps: 20, // Further reduced steps
+          samples: 1,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('Stability AI API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
+
+      if (response.status === 429 && retryCount < MAX_RETRIES) {
+        const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        console.log(`Rate limited. Retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return callStabilityAPI(prompt, retryCount + 1);
+      }
+
+      throw new Error(response.statusText);
+    }
+
+    return response;
+  } catch (error) {
+    console.error(`API call attempt ${retryCount + 1} failed:`, error);
+    if (retryCount < MAX_RETRIES) {
+      const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+      console.log(`Retrying in ${retryDelay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      return callStabilityAPI(prompt, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -68,65 +131,30 @@ serve(async (req) => {
     }
 
     logRequest(clientId);
-    console.log(`Generating image for prompt: "${prompt}"`);
 
-    const response = await fetch(
-      "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
-        },
-        body: JSON.stringify({
-          text_prompts: [
-            {
-              text: prompt,
-              weight: 1,
-            },
-          ],
-          cfg_scale: 7,
-          height: 1024,
-          width: 1024,
-          steps: 25, // Reduced steps for faster generation
-          samples: 1,
+    try {
+      const response = await callStabilityAPI(prompt);
+      const result = await response.json();
+      const base64Image = result.artifacts[0].base64;
+      const imageUrl = `data:image/png;base64,${base64Image}`;
+
+      console.log('Successfully generated image');
+      return new Response(
+        JSON.stringify({ imageUrl }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error('Stability AI API error:', error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'The AI service is currently busy. Please try again in a few minutes.' 
         }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.error('Stability AI API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorData
-      });
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'The AI service is currently busy. Please try again in a few minutes.' 
-          }),
-          { 
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
-
-      throw new Error(`Stability AI API error: ${response.statusText}`);
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
-
-    const result = await response.json();
-    const base64Image = result.artifacts[0].base64;
-    const imageUrl = `data:image/png;base64,${base64Image}`;
-
-    console.log('Successfully generated image');
-    return new Response(
-      JSON.stringify({ imageUrl }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error in generate-image function:', error);
     return new Response(

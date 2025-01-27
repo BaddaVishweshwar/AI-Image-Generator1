@@ -87,7 +87,13 @@ const ImageGenerator = () => {
       toast.success("Image generated and saved successfully!");
     } catch (error: any) {
       console.error("Error generating image:", error);
-      toast.error(error.message || "Failed to generate image. Please try again.");
+      
+      // Handle specific error messages
+      if (error.message.includes('429')) {
+        toast.error("You've reached the rate limit. Please wait a minute before trying again.");
+      } else {
+        toast.error(error.message || "Failed to generate image. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

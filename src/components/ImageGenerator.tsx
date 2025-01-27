@@ -40,11 +40,14 @@ const ImageGenerator = () => {
     setIsLoading(true);
     try {
       // Call Supabase Edge Function to generate image
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error: functionError } = await supabase.functions.invoke('generate-image', {
         body: { prompt }
       });
 
-      if (error) throw error;
+      if (functionError) {
+        console.error("Function error:", functionError);
+        throw new Error(functionError.message || 'Failed to generate image');
+      }
 
       if (!data?.imageUrl) {
         throw new Error('No image was generated');
@@ -52,18 +55,22 @@ const ImageGenerator = () => {
 
       setImageUrl(data.imageUrl);
 
-      // Get the user's profile using maybeSingle() instead of single()
-      const { data: profile, error: profileError } = await supabase
+      // Get the user's profile
+      const { data: profiles, error: profileError } = await supabase
         .from("profiles")
         .select("id")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
+        .eq("user_id", session.user.id);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Profile error:", profileError);
+        throw new Error('Failed to fetch profile');
+      }
 
-      if (!profile?.id) {
+      if (!profiles || profiles.length === 0) {
         throw new Error("Profile not found. Please try logging out and back in.");
       }
+
+      const profile = profiles[0];
 
       // Store the image in Supabase
       const { error: insertError } = await supabase.from("images").insert({
@@ -72,7 +79,10 @@ const ImageGenerator = () => {
         profile_id: profile.id,
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw new Error('Failed to save image');
+      }
 
       toast.success("Image generated and saved successfully!");
     } catch (error: any) {

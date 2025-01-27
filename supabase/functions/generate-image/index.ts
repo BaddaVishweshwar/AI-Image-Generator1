@@ -7,7 +7,7 @@ const corsHeaders = {
 
 // Enhanced rate limiting parameters
 const RATE_LIMIT_WINDOW = 120000; // 2 minutes
-const MAX_REQUESTS_PER_WINDOW = 2; // 2 requests per 2 minutes
+const MAX_REQUESTS_PER_WINDOW = 1; // 1 request per 2 minutes for stricter limiting
 const requestLog = new Map<string, number[]>();
 
 // Retry configuration
@@ -56,7 +56,7 @@ async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Respons
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 20, // Reduced steps for better performance
+          steps: 15, // Reduced steps further for better performance
           samples: 1,
         }),
       }
@@ -77,7 +77,7 @@ async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Respons
         return callStabilityAPI(prompt, retryCount + 1);
       }
 
-      throw new Error(response.statusText);
+      throw new Error(response.statusText || 'Failed to generate image');
     }
 
     return response;
@@ -136,10 +136,14 @@ serve(async (req) => {
     try {
       const response = await callStabilityAPI(prompt);
       const result = await response.json();
-      const base64Image = result.artifacts[0].base64;
-      const imageUrl = `data:image/png;base64,${base64Image}`;
+      
+      if (!result.artifacts?.[0]?.base64) {
+        throw new Error('No image data received from the API');
+      }
 
+      const imageUrl = `data:image/png;base64,${result.artifacts[0].base64}`;
       console.log('Successfully generated image');
+      
       return new Response(
         JSON.stringify({ imageUrl }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -25,7 +25,7 @@ const SampleImages = () => {
         <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Sample Generations</h2>
         <div className="grid md:grid-cols-3 gap-6">
           {sampleImages.map((image, index) => (
-            <Card key={index} className="hover:shadow-lg transition-shadow duration-300">
+            <Card key={index} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg text-purple-800">{image.title}</CardTitle>
                 <CardDescription className="text-gray-600">Prompt: {image.prompt}</CardDescription>

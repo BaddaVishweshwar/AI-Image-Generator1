@@ -7,7 +7,7 @@ const corsHeaders = {
 
 // Enhanced rate limiting parameters
 const RATE_LIMIT_WINDOW = 120000; // 2 minutes
-const MAX_REQUESTS_PER_WINDOW = 2; // Reduced to 2 requests per 2 minutes
+const MAX_REQUESTS_PER_WINDOW = 2; // 2 requests per 2 minutes
 const requestLog = new Map<string, number[]>();
 
 // Retry configuration
@@ -56,7 +56,7 @@ async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Respons
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 20, // Further reduced steps
+          steps: 20, // Reduced steps for better performance
           samples: 1,
         }),
       }
@@ -94,6 +94,7 @@ async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Respons
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

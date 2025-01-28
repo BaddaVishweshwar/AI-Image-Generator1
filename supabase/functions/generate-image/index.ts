@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,11 +40,16 @@ serve(async (req) => {
       const error = await response.json();
       console.error('DALL-E API error:', error);
       
-      // Handle specific error cases
-      if (error.error?.message?.includes('billing')) {
-        throw new Error('OpenAI API billing limit reached. Please try again later.');
+      // Check if the error is related to billing
+      if (error.error?.type === 'billing_error' || 
+          error.error?.message?.includes('billing') ||
+          error.error?.code === 'insufficient_quota') {
+        throw new Error('OpenAI API billing limit reached. Please check your OpenAI account billing status and ensure you have sufficient credits.');
       }
-      if (error.error?.message?.includes('rate')) {
+      
+      // Check for rate limiting
+      if (error.error?.type === 'rate_limit_error' || 
+          error.error?.message?.includes('rate')) {
         throw new Error('Rate limit reached. Please wait a few minutes before trying again.');
       }
       
@@ -65,7 +71,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in generate-image function:', error);
     
-    // Determine the appropriate status code
+    // Set appropriate status codes based on error type
     let statusCode = 500;
     if (error.message.includes('billing')) {
       statusCode = 402; // Payment Required

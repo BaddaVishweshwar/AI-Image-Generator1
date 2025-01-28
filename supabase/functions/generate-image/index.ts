@@ -38,6 +38,15 @@ serve(async (req) => {
     if (!response.ok) {
       const error = await response.json();
       console.error('DALL-E API error:', error);
+      
+      // Handle specific error cases
+      if (error.error?.message?.includes('billing')) {
+        throw new Error('OpenAI API billing limit reached. Please try again later.');
+      }
+      if (error.error?.message?.includes('rate')) {
+        throw new Error('Rate limit reached. Please wait a few minutes before trying again.');
+      }
+      
       throw new Error(error.error?.message || 'Failed to generate image');
     }
 
@@ -55,12 +64,21 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in generate-image function:', error);
+    
+    // Determine the appropriate status code
+    let statusCode = 500;
+    if (error.message.includes('billing')) {
+      statusCode = 402; // Payment Required
+    } else if (error.message.includes('rate')) {
+      statusCode = 429; // Too Many Requests
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to generate image. Please try again.' 
       }),
       { 
-        status: error.status || 500,
+        status: statusCode,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

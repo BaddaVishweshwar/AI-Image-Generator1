@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const sampleImages = [
   {
-    url: "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31?auto=format&fit=crop&w=800&q=80",
+    url: "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?auto=format&fit=crop&w=800&q=80",
     prompt: "A girl riding a bicycle on a quiet street",
     title: "Peaceful Ride"
   },
@@ -36,7 +36,7 @@ const SampleImages = () => {
                   alt={image.prompt}
                   className="w-full h-48 object-cover rounded-md hover:scale-105 transition-transform duration-300"
                   onError={(e) => {
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31?auto=format&fit=crop&w=800&q=80";
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?auto=format&fit=crop&w=800&q=80";
                   }}
                 />
               </CardContent>

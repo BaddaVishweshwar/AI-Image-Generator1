@@ -27,10 +27,11 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: "dall-e-3",
         prompt,
         n: 1,
-        size: '1024x1024',
-        response_format: 'b64_json',
+        size: "1024x1024",
+        response_format: "url",
       }),
     });
 
@@ -42,14 +43,14 @@ serve(async (req) => {
 
     const data = await response.json();
     
-    if (!data.data?.[0]?.b64_json) {
-      throw new Error('No image data received from DALL-E');
+    if (!data.data?.[0]?.url) {
+      throw new Error('No image URL received from DALL-E');
     }
 
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ imageUrl: `data:image/png;base64,${data.data[0].b64_json}` }),
+      JSON.stringify({ imageUrl: data.data[0].url }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

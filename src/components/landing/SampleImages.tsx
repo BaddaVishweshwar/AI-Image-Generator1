@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const sampleImages = [
   {
     url: "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?auto=format&fit=crop&w=800&q=80",
-    prompt: "A girl riding a bicycle on a quiet street",
-    title: "Peaceful Ride"
+    prompt: "A serene mountain landscape with snow-capped peaks and a misty valley at sunrise",
+    title: "Mountain Majesty"
   },
   {
     url: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&w=800&q=80",

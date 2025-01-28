@@ -128,9 +128,9 @@ const ImageGenerator = () => {
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">AI Image Generator</h2>
+        <h2 className="text-2xl font-bold">PromptToPicture</h2>
         <p className="text-muted-foreground">
-          Enter a prompt to generate an image using DALL-E
+          Turn Your Imagination Into Stunning AI-Generated Art
         </p>
       </div>
 

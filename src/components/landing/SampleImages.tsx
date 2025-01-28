@@ -2,17 +2,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const sampleImages = [
   {
-    url: "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31",
+    url: "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31?auto=format&fit=crop&w=800&q=80",
     prompt: "A girl riding a bicycle on a quiet street",
     title: "Peaceful Ride"
   },
   {
-    url: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d",
+    url: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&w=800&q=80",
     prompt: "A cup of coffee on a wooden table with a book beside it",
     title: "Coffee & Literature"
   },
   {
-    url: "https://images.unsplash.com/photo-1501426026826-31c667bdf23d",
+    url: "https://images.unsplash.com/photo-1501426026826-31c667bdf23d?auto=format&fit=crop&w=800&q=80",
     prompt: "A bird flying over a calm lake at sunrise",
     title: "Dawn Flight"
   }
@@ -35,6 +35,9 @@ const SampleImages = () => {
                   src={image.url}
                   alt={image.prompt}
                   className="w-full h-48 object-cover rounded-md hover:scale-105 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31?auto=format&fit=crop&w=800&q=80";
+                  }}
                 />
               </CardContent>
             </Card>

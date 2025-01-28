@@ -7,12 +7,8 @@ const corsHeaders = {
 
 // Enhanced rate limiting parameters
 const RATE_LIMIT_WINDOW = 120000; // 2 minutes
-const MAX_REQUESTS_PER_WINDOW = 1; // 1 request per 2 minutes for stricter limiting
+const MAX_REQUESTS_PER_WINDOW = 1; // 1 request per 2 minutes
 const requestLog = new Map<string, number[]>();
-
-// Retry configuration
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 function isRateLimited(clientId: string): boolean {
   const now = Date.now();
@@ -33,62 +29,39 @@ function logRequest(clientId: string) {
   requestLog.set(clientId, clientRequests);
 }
 
-async function callStabilityAPI(prompt: string, retryCount = 0): Promise<Response> {
+async function generateImage(prompt: string): Promise<Response> {
   try {
-    console.log(`Attempt ${retryCount + 1} to generate image for prompt: "${prompt}"`);
-    
-    const response = await fetch(
-      "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
-        },
-        body: JSON.stringify({
-          text_prompts: [
-            {
-              text: prompt,
-              weight: 1,
-            },
-          ],
-          cfg_scale: 7,
-          height: 1024,
-          width: 1024,
-          steps: 15, // Reduced steps further for better performance
-          samples: 1,
-        }),
-      }
-    );
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+      },
+      body: JSON.stringify({
+        prompt,
+        n: 1,
+        size: '1024x1024',
+        response_format: 'b64_json',
+      }),
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.error('Stability AI API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorData
-      });
-
-      if (response.status === 429 && retryCount < MAX_RETRIES) {
-        const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-        console.log(`Rate limited. Retrying in ${retryDelay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return callStabilityAPI(prompt, retryCount + 1);
-      }
-
-      throw new Error(response.statusText || 'Failed to generate image');
+      const error = await response.json().catch(() => null);
+      console.error('DALL-E API error:', error);
+      throw new Error(error?.error?.message || 'Failed to generate image');
     }
 
-    return response;
+    const data = await response.json();
+    if (!data.data?.[0]?.b64_json) {
+      throw new Error('No image data received from DALL-E');
+    }
+
+    return new Response(
+      JSON.stringify({ imageUrl: `data:image/png;base64,${data.data[0].b64_json}` }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error(`API call attempt ${retryCount + 1} failed:`, error);
-    if (retryCount < MAX_RETRIES) {
-      const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-      console.log(`Retrying in ${retryDelay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-      return callStabilityAPI(prompt, retryCount + 1);
-    }
+    console.error('Error generating image:', error);
     throw error;
   }
 }
@@ -118,7 +91,7 @@ serve(async (req) => {
       console.log(`Rate limit exceeded for client: ${clientId}`);
       return new Response(
         JSON.stringify({ 
-          error: 'Rate limit exceeded. Please wait 2 minutes between requests to ensure fair usage.' 
+          error: 'Rate limit exceeded. Please wait 2 minutes between requests.' 
         }),
         { 
           status: 429,
@@ -134,28 +107,15 @@ serve(async (req) => {
     logRequest(clientId);
 
     try {
-      const response = await callStabilityAPI(prompt);
-      const result = await response.json();
-      
-      if (!result.artifacts?.[0]?.base64) {
-        throw new Error('No image data received from the API');
-      }
-
-      const imageUrl = `data:image/png;base64,${result.artifacts[0].base64}`;
-      console.log('Successfully generated image');
-      
-      return new Response(
-        JSON.stringify({ imageUrl }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return await generateImage(prompt);
     } catch (error) {
-      console.error('Stability AI API error:', error);
+      console.error('DALL-E API error:', error);
       return new Response(
         JSON.stringify({ 
-          error: 'The AI service is currently busy. Please try again in a few minutes.' 
+          error: 'Failed to generate image. Please try again in a few minutes.' 
         }),
         { 
-          status: 429,
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -164,7 +124,7 @@ serve(async (req) => {
     console.error('Error in generate-image function:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to generate image. Please try again in a few minutes.' 
+        error: 'Internal server error. Please try again.' 
       }),
       { 
         status: 500,

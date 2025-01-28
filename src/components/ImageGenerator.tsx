@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Download } from "lucide-react";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -25,6 +26,17 @@ const ImageGenerator = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const handleDownload = async () => {
+    if (!imageUrl) return;
+
+    const link = document.createElement("a");
+    link.href = imageUrl;
+    link.download = `generated-image-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleGenerate = async () => {
     if (!session) {
@@ -118,7 +130,7 @@ const ImageGenerator = () => {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">AI Image Generator</h2>
         <p className="text-muted-foreground">
-          Enter a prompt to generate an image using Stability AI
+          Enter a prompt to generate an image using DALL-E
         </p>
       </div>
 
@@ -139,6 +151,12 @@ const ImageGenerator = () => {
       {imageUrl && (
         <div className="rounded-lg overflow-hidden border">
           <img src={imageUrl} alt={prompt} className="w-full h-auto" />
+          <div className="p-4 bg-white border-t">
+            <Button onClick={handleDownload} className="w-full">
+              <Download className="w-4 h-4 mr-2" />
+              Download Image
+            </Button>
+          </div>
         </div>
       )}
     </div>

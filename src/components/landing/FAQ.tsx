@@ -13,7 +13,7 @@ const FAQ = () => {
     },
     {
       question: "Is it free?",
-      answer: "We offer both free and premium tiers. The free tier allows you to generate a limited number of images per day, while our premium plans offer more generations, higher resolution options, and additional features."
+      answer: "Yes, we provide a free tier that allows you to generate a limited number of images per day. You can start exploring the power of AI-generated visuals without any cost!"
     },
     {
       question: "What styles are available?",
@@ -28,7 +28,7 @@ const FAQ = () => {
   return (
     <section className="py-12 bg-gradient-to-r from-purple-50 to-pink-50">
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">Frequently Asked Questions</h2>
+        <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">FAQ</h2>
         <div className="max-w-3xl mx-auto">
           <Accordion type="single" collapsible className="space-y-4">
             {faqs.map((faq, index) => (

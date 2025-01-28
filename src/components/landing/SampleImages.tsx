@@ -2,19 +2,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const sampleImages = [
   {
-    url: "https://images.unsplash.com/photo-1531415074968-036ba1b575da",
-    prompt: "A boy playing cricket in a sunny field",
-    title: "Cricket Action"
+    url: "https://images.unsplash.com/photo-1532994878831-7c0cb6d72e31",
+    prompt: "A girl riding a bicycle on a quiet street",
+    title: "Peaceful Ride"
   },
   {
-    url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe",
-    prompt: "Sunset over a peaceful mountain landscape",
-    title: "Nature's Beauty"
+    url: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d",
+    prompt: "A cup of coffee on a wooden table with a book beside it",
+    title: "Coffee & Literature"
   },
   {
-    url: "https://images.unsplash.com/photo-1569172122301-bc5008bc09c5",
-    prompt: "A modern city skyline at night with glowing lights",
-    title: "Urban Night"
+    url: "https://images.unsplash.com/photo-1501426026826-31c667bdf23d",
+    prompt: "A bird flying over a calm lake at sunrise",
+    title: "Dawn Flight"
   }
 ];
 

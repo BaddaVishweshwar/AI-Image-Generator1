@@ -5,6 +5,13 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Download } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+
+const EXAMPLE_PROMPTS = [
+  "A serene Japanese garden with cherry blossoms, traditional architecture, and a small koi pond",
+  "A futuristic cityscape at night with neon lights, flying cars, and towering skyscrapers",
+  "A magical forest scene with glowing mushrooms, fairy lights, and mystical creatures"
+];
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -111,6 +118,10 @@ const ImageGenerator = () => {
     }
   };
 
+  const handleExampleClick = (examplePrompt: string) => {
+    setPrompt(examplePrompt);
+  };
+
   if (!session) {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -137,7 +148,7 @@ const ImageGenerator = () => {
       <div className="space-y-4">
         <div className="flex gap-2">
           <Input
-            placeholder="Enter your prompt..."
+            placeholder="Enter your prompt (e.g., 'A magical forest at sunset with glowing mushrooms')"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             className="flex-1"
@@ -145,6 +156,23 @@ const ImageGenerator = () => {
           <Button onClick={handleGenerate} disabled={isLoading}>
             {isLoading ? "Generating..." : "Generate"}
           </Button>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Example prompts:</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {EXAMPLE_PROMPTS.map((examplePrompt, index) => (
+              <Card 
+                key={index} 
+                className="cursor-pointer hover:bg-accent transition-colors"
+                onClick={() => handleExampleClick(examplePrompt)}
+              >
+                <CardContent className="p-3">
+                  <p className="text-sm">{examplePrompt}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
 

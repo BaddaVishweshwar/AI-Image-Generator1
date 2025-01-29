@@ -21,68 +21,69 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
-        model: "dall-e-3",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "url",
+        text_prompts: [
+          {
+            text: prompt,
+            weight: 1
+          }
+        ],
+        cfg_scale: 7,
+        height: 1024,
+        width: 1024,
+        steps: 30,
+        samples: 1
       }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('DALL-E API error:', error);
+      console.error('Stability AI API error:', error);
       
-      // Check if the error is related to billing
-      if (error.error?.type === 'billing_error' || 
-          error.error?.message?.includes('billing') ||
-          error.error?.code === 'insufficient_quota') {
-        throw new Error('OpenAI API billing limit reached. Please check your OpenAI account billing status and ensure you have sufficient credits.');
+      if (error.message?.includes('billing') || error.message?.includes('quota')) {
+        throw new Error('API billing limit reached. Please check your Stability AI account billing status.');
       }
       
-      // Check for rate limiting
-      if (error.error?.type === 'rate_limit_error' || 
-          error.error?.message?.includes('rate')) {
+      if (error.message?.includes('rate')) {
         throw new Error('Rate limit reached. Please wait a few minutes before trying again.');
       }
       
-      throw new Error(error.error?.message || 'Failed to generate image');
+      throw new Error(error.message || 'Failed to generate image');
     }
 
     const data = await response.json();
     
-    if (!data.data?.[0]?.url) {
-      throw new Error('No image URL received from DALL-E');
+    if (!data.artifacts?.[0]?.base64) {
+      throw new Error('No image data received from Stability AI');
     }
 
+    // Convert base64 to image URL
+    const imageUrl = `data:image/png;base64,${data.artifacts[0].base64}`;
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ imageUrl: data.data[0].url }),
+      JSON.stringify({ imageUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in generate-image function:', error);
     
-    // Set appropriate status codes based on error type
     let statusCode = 500;
-    if (error.message.includes('billing')) {
-      statusCode = 402; // Payment Required
-    } else if (error.message.includes('rate')) {
-      statusCode = 429; // Too Many Requests
+    if (error.message?.includes('billing')) {
+      statusCode = 402;
+    } else if (error.message?.includes('rate')) {
+      statusCode = 429;
     }
     
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Failed to generate image. Please try again.' 
-      }),
+      JSON.stringify({ error: error.message || 'Failed to generate image' }),
       { 
         status: statusCode,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

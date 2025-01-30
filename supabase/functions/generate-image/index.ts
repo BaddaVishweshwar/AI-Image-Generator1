@@ -64,12 +64,10 @@ serve(async (req) => {
       throw new Error('No image data received from Stability AI');
     }
 
-    // Convert base64 to image URL
-    const imageUrl = `data:image/png;base64,${data.artifacts[0].base64}`;
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ imageUrl: `data:image/png;base64,${data.artifacts[0].base64}` }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

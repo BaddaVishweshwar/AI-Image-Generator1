@@ -21,38 +21,48 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    // Generate image using DeepAI's text-to-image API
-    const response = await fetch('https://api.deepai.org/api/text2img', {
+    const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
       method: 'POST',
       headers: {
-        'api-key': Deno.env.get('DEEPAI_API_KEY') || '',
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
       },
       body: JSON.stringify({
-        text: prompt,
-        grid_size: 1,
+        text_prompts: [
+          {
+            text: prompt,
+            weight: 1
+          }
+        ],
+        cfg_scale: 7,
+        height: 1024,
+        width: 1024,
+        steps: 30,
+        samples: 1
       }),
     });
 
     if (!response.ok) {
-      console.error('DeepAI API error status:', response.status);
+      console.error('Stability AI API error status:', response.status);
       const errorText = await response.text();
-      console.error('DeepAI API error response:', errorText);
-      throw new Error(`DeepAI API error: ${errorText}`);
+      console.error('Stability AI API error response:', errorText);
+      throw new Error(`Stability AI API error: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('DeepAI API Response:', data);
+    console.log('Stability AI API Response received');
     
-    if (!data.output_url) {
-      console.error('No image URL in response:', data);
-      throw new Error('No image URL received from API');
+    if (!data.artifacts?.[0]?.base64) {
+      console.error('No image data in response:', data);
+      throw new Error('No image data received from API');
     }
 
-    console.log('Successfully generated image:', data.output_url);
+    // Convert base64 to URL
+    const imageUrl = `data:image/png;base64,${data.artifacts[0].base64}`;
 
     return new Response(
-      JSON.stringify({ imageUrl: data.output_url }),
+      JSON.stringify({ imageUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

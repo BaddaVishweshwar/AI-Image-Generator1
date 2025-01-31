@@ -21,11 +21,11 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    // First, generate the image using text-to-image model
+    // Generate image using DeepAI's text-to-image API
     const response = await fetch('https://api.deepai.org/api/text2img', {
       method: 'POST',
       headers: {
-        'api-key': Deno.env.get('GEMINI_API_KEY') || '',
+        'api-key': Deno.env.get('DEEPAI_API_KEY') || '',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -35,19 +35,21 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('DeepAI API error:', error);
-      throw new Error(error.message || 'Failed to generate image');
+      console.error('DeepAI API error status:', response.status);
+      const errorText = await response.text();
+      console.error('DeepAI API error response:', errorText);
+      throw new Error(`DeepAI API error: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('API Response:', data);
+    console.log('DeepAI API Response:', data);
     
     if (!data.output_url) {
+      console.error('No image URL in response:', data);
       throw new Error('No image URL received from API');
     }
 
-    console.log('Successfully generated image');
+    console.log('Successfully generated image:', data.output_url);
 
     return new Response(
       JSON.stringify({ imageUrl: data.output_url }),
@@ -57,12 +59,15 @@ serve(async (req) => {
     console.error('Error in generate-image function:', error);
     
     let statusCode = 500;
+    let errorMessage = error.message || 'Failed to generate image';
+    
     if (error.message?.includes('quota')) {
       statusCode = 429;
+      errorMessage = 'API rate limit exceeded. Please try again later.';
     }
     
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to generate image' }),
+      JSON.stringify({ error: errorMessage }),
       { 
         status: statusCode,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

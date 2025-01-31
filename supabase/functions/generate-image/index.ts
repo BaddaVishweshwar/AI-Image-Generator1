@@ -21,36 +21,36 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro-vision:generateContent', {
+    // First, generate the image using text-to-image model
+    const response = await fetch('https://api.deepai.org/api/text2img', {
       method: 'POST',
       headers: {
+        'api-key': Deno.env.get('GEMINI_API_KEY') || '',
         'Content-Type': 'application/json',
-        'x-goog-api-key': Deno.env.get('GEMINI_API_KEY') || '',
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Generate an image based on this description: ${prompt}`
-          }]
-        }]
+        text: prompt,
+        grid_size: 1,
       }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('Gemini API error:', error);
+      console.error('DeepAI API error:', error);
       throw new Error(error.message || 'Failed to generate image');
     }
 
     const data = await response.json();
+    console.log('API Response:', data);
     
-    // Extract the image URL from Gemini's response
-    const imageData = data.candidates[0].content.parts[0].text;
-    
+    if (!data.output_url) {
+      throw new Error('No image URL received from API');
+    }
+
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ imageUrl: imageData }),
+      JSON.stringify({ imageUrl: data.output_url }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

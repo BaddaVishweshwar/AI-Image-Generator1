@@ -21,62 +21,43 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro-vision:generateContent', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'x-goog-api-key': Deno.env.get('GEMINI_API_KEY') || '',
       },
       body: JSON.stringify({
-        text_prompts: [
-          {
-            text: prompt,
-            weight: 1
-          }
-        ],
-        cfg_scale: 7,
-        height: 1024,
-        width: 1024,
-        steps: 30,
-        samples: 1
+        contents: [{
+          parts: [{
+            text: `Generate an image based on this description: ${prompt}`
+          }]
+        }]
       }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('Stability AI API error:', error);
-      
-      if (error.message?.includes('billing') || error.message?.includes('quota')) {
-        throw new Error('API billing limit reached. Please check your Stability AI account billing status.');
-      }
-      
-      if (error.message?.includes('rate')) {
-        throw new Error('Rate limit reached. Please wait a few minutes before trying again.');
-      }
-      
+      console.error('Gemini API error:', error);
       throw new Error(error.message || 'Failed to generate image');
     }
 
     const data = await response.json();
     
-    if (!data.artifacts?.[0]?.base64) {
-      throw new Error('No image data received from Stability AI');
-    }
-
+    // Extract the image URL from Gemini's response
+    const imageData = data.candidates[0].content.parts[0].text;
+    
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ imageUrl: `data:image/png;base64,${data.artifacts[0].base64}` }),
+      JSON.stringify({ imageUrl: imageData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in generate-image function:', error);
     
     let statusCode = 500;
-    if (error.message?.includes('billing')) {
-      statusCode = 402;
-    } else if (error.message?.includes('rate')) {
+    if (error.message?.includes('quota')) {
       statusCode = 429;
     }
     

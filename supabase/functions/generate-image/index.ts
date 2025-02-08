@@ -22,30 +22,12 @@ serve(async (req) => {
     }
 
     const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-    console.log('Token available:', !!token); // Log if token exists without exposing it
-    
     if (!token) {
       console.error('Hugging Face token not found');
       throw new Error('API configuration error');
     }
 
     console.log('Generating image for prompt:', prompt);
-
-    // Test token validity before attempting image generation
-    try {
-      const testResponse = await fetch('https://huggingface.co/api/whoami', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!testResponse.ok) {
-        console.error('Token validation failed:', await testResponse.text());
-        throw new Error('Invalid or expired API token. Please check your Hugging Face access token.');
-      }
-      console.log('Token validated successfully');
-    } catch (tokenError) {
-      console.error('Token validation error:', tokenError);
-      throw new Error('Failed to validate Hugging Face access token');
-    }
 
     const hf = new HfInference(token);
 

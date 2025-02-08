@@ -31,6 +31,22 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
+    // Test token validity before attempting image generation
+    try {
+      const testResponse = await fetch('https://huggingface.co/api/whoami', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!testResponse.ok) {
+        console.error('Token validation failed:', await testResponse.text());
+        throw new Error('Invalid or expired API token. Please check your Hugging Face access token.');
+      }
+      console.log('Token validated successfully');
+    } catch (tokenError) {
+      console.error('Token validation error:', tokenError);
+      throw new Error('Failed to validate Hugging Face access token');
+    }
+
     const hf = new HfInference(token);
 
     try {

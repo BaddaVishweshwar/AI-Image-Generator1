@@ -22,6 +22,8 @@ serve(async (req) => {
     }
 
     const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+    console.log('Token available:', !!token); // Log if token exists without exposing it
+    
     if (!token) {
       console.error('Hugging Face token not found');
       throw new Error('API configuration error');

@@ -1,5 +1,7 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,45 +23,19 @@ serve(async (req) => {
 
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('STABILITY_API_KEY')}`,
-      },
-      body: JSON.stringify({
-        text_prompts: [
-          {
-            text: prompt,
-            weight: 1
-          }
-        ],
-        cfg_scale: 7,
-        height: 1024,
-        width: 1024,
-        steps: 30,
-        samples: 1
-      }),
+    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'));
+
+    const image = await hf.textToImage({
+      inputs: prompt,
+      model: 'black-forest-labs/FLUX.1-schnell',
     });
 
-    if (!response.ok) {
-      console.error('Stability AI API error status:', response.status);
-      const errorText = await response.text();
-      console.error('Stability AI API error response:', errorText);
-      throw new Error(`Stability AI API error: ${errorText}`);
-    }
+    console.log('Image generated successfully');
 
-    const data = await response.json();
-    console.log('Stability AI API Response received');
-    
-    if (!data.artifacts?.[0]?.base64) {
-      console.error('No image data in response:', data);
-      throw new Error('No image data received from API');
-    }
-
-    // Convert base64 to URL
-    const imageUrl = `data:image/png;base64,${data.artifacts[0].base64}`;
+    // Convert the blob to a base64 string
+    const arrayBuffer = await image.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const imageUrl = `data:image/png;base64,${base64}`;
 
     return new Response(
       JSON.stringify({ imageUrl }),
@@ -71,7 +47,7 @@ serve(async (req) => {
     let statusCode = 500;
     let errorMessage = error.message || 'Failed to generate image';
     
-    if (error.message?.includes('quota')) {
+    if (error.message?.includes('rate limit')) {
       statusCode = 429;
       errorMessage = 'API rate limit exceeded. Please try again later.';
     }

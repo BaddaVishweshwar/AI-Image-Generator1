@@ -21,26 +21,41 @@ serve(async (req) => {
       throw new Error('Prompt is required');
     }
 
+    const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+    if (!token) {
+      console.error('Hugging Face token not found');
+      throw new Error('API configuration error');
+    }
+
     console.log('Generating image for prompt:', prompt);
 
-    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'));
+    const hf = new HfInference(token);
 
-    const image = await hf.textToImage({
-      inputs: prompt,
-      model: 'black-forest-labs/FLUX.1-schnell',
-    });
+    try {
+      const image = await hf.textToImage({
+        inputs: prompt,
+        model: 'black-forest-labs/FLUX.1-schnell',
+      });
 
-    console.log('Image generated successfully');
+      console.log('Image generated successfully');
 
-    // Convert the blob to a base64 string
-    const arrayBuffer = await image.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    const imageUrl = `data:image/png;base64,${base64}`;
+      // Convert the blob to a base64 string
+      const arrayBuffer = await image.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const imageUrl = `data:image/png;base64,${base64}`;
 
-    return new Response(
-      JSON.stringify({ imageUrl }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      return new Response(
+        JSON.stringify({ imageUrl }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (apiError) {
+      console.error('Hugging Face API error:', apiError);
+      
+      if (apiError.message?.includes('401') || apiError.message?.includes('unauthorized')) {
+        throw new Error('Invalid or expired API token. Please check your Hugging Face access token.');
+      }
+      throw apiError;
+    }
   } catch (error) {
     console.error('Error in generate-image function:', error);
     
@@ -50,6 +65,9 @@ serve(async (req) => {
     if (error.message?.includes('rate limit')) {
       statusCode = 429;
       errorMessage = 'API rate limit exceeded. Please try again later.';
+    } else if (error.message?.includes('API token')) {
+      statusCode = 401;
+      errorMessage = error.message;
     }
     
     return new Response(

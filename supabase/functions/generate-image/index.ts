@@ -34,15 +34,28 @@ serve(async (req) => {
     try {
       const image = await hf.textToImage({
         inputs: prompt,
-        model: 'black-forest-labs/FLUX.1-schnell',
+        model: 'stabilityai/stable-diffusion-2-1',
+        parameters: {
+          negative_prompt: 'blurry, bad quality, distorted',
+        }
       });
 
-      console.log('Image generated successfully');
+      if (!image) {
+        throw new Error('No image was generated');
+      }
+
+      console.log('Image generated successfully, converting to base64');
 
       // Convert the blob to a base64 string
       const arrayBuffer = await image.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        throw new Error('Invalid image data received');
+      }
+
       const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
       const imageUrl = `data:image/png;base64,${base64}`;
+
+      console.log('Successfully converted image to base64');
 
       return new Response(
         JSON.stringify({ imageUrl }),
@@ -54,7 +67,12 @@ serve(async (req) => {
       if (apiError.message?.includes('401') || apiError.message?.includes('unauthorized')) {
         throw new Error('Invalid or expired API token. Please check your Hugging Face access token.');
       }
-      throw apiError;
+      
+      if (apiError.message?.includes('429')) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+      
+      throw new Error(`Image generation failed: ${apiError.message}`);
     }
   } catch (error) {
     console.error('Error in generate-image function:', error);

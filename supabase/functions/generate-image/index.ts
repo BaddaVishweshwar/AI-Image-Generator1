@@ -46,13 +46,27 @@ serve(async (req) => {
 
       console.log('Image generated successfully, converting to base64');
 
-      // Convert the blob to a base64 string
-      const arrayBuffer = await image.arrayBuffer();
-      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        throw new Error('Invalid image data received');
+      // Convert the blob to base64 string in chunks to avoid stack overflow
+      const chunks: Uint8Array[] = [];
+      const reader = image.stream().getReader();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
       }
 
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      // Combine chunks
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedArray = new Uint8Array(totalLength);
+      let position = 0;
+      
+      for (const chunk of chunks) {
+        combinedArray.set(chunk, position);
+        position += chunk.length;
+      }
+
+      const base64 = btoa(String.fromCharCode(...combinedArray));
       const imageUrl = `data:image/png;base64,${base64}`;
 
       console.log('Successfully converted image to base64');

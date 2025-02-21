@@ -34,9 +34,10 @@ serve(async (req) => {
     try {
       const image = await hf.textToImage({
         inputs: prompt,
-        model: 'stabilityai/stable-diffusion-2-1',
+        model: 'black-forest-labs/FLUX.1-schnell',  // Using a faster model
         parameters: {
-          negative_prompt: 'blurry, bad quality, distorted',
+          num_inference_steps: 20,  // Reduced for faster generation
+          guidance_scale: 7.5
         }
       });
 
@@ -46,27 +47,9 @@ serve(async (req) => {
 
       console.log('Image generated successfully, converting to base64');
 
-      // Convert the blob to base64 string in chunks to avoid stack overflow
-      const chunks: Uint8Array[] = [];
-      const reader = image.stream().getReader();
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-
-      // Combine chunks
-      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const combinedArray = new Uint8Array(totalLength);
-      let position = 0;
-      
-      for (const chunk of chunks) {
-        combinedArray.set(chunk, position);
-        position += chunk.length;
-      }
-
-      const base64 = btoa(String.fromCharCode(...combinedArray));
+      // Convert the blob to base64 string
+      const arrayBuffer = await image.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
       const imageUrl = `data:image/png;base64,${base64}`;
 
       console.log('Successfully converted image to base64');

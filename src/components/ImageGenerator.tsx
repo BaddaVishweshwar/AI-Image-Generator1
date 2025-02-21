@@ -8,9 +8,10 @@ import { Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const EXAMPLE_PROMPTS = [
-  "A serene Japanese garden with cherry blossoms, traditional architecture, and a small koi pond",
+  "A vibrant underwater scene with colorful coral reefs, tropical fish, and dancing light beams",
   "A futuristic cityscape at night with neon lights, flying cars, and towering skyscrapers",
-  "A magical forest scene with glowing mushrooms, fairy lights, and mystical creatures"
+  "A magical forest scene with glowing mushrooms, fairy lights, and mystical creatures",
+  "A cozy autumn cabin in the woods with falling leaves, smoke from the chimney, and a warm golden light"
 ];
 
 const ImageGenerator = () => {

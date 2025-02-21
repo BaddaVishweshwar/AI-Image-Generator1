@@ -32,12 +32,14 @@ serve(async (req) => {
     const hf = new HfInference(token);
     console.log('Created Hugging Face inference instance');
 
+    // Using a faster and more reliable model
     const image = await hf.textToImage({
       inputs: prompt,
-      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      model: 'runwayml/stable-diffusion-v1-5',
       parameters: {
-        num_inference_steps: 30,
-        guidance_scale: 7.5,
+        negative_prompt: "blurry, bad quality, distorted",
+        num_inference_steps: 20,
+        guidance_scale: 7,
       }
     });
 
@@ -64,12 +66,16 @@ serve(async (req) => {
     let statusCode = 500;
     let errorMessage = error.message || 'Failed to generate image';
     
+    // More specific error handling
     if (error.message?.includes('rate limit')) {
       statusCode = 429;
       errorMessage = 'API rate limit exceeded. Please try again later.';
-    } else if (error.message?.includes('API')) {
+    } else if (error.message?.includes('invalid token')) {
       statusCode = 401;
-      errorMessage = error.message;
+      errorMessage = 'Invalid API token. Please check your Hugging Face API key.';
+    } else if (error.message?.includes('model not found')) {
+      statusCode = 404;
+      errorMessage = 'The AI model could not be loaded. Please try again.';
     }
     
     return new Response(

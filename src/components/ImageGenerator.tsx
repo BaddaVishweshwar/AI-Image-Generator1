@@ -8,10 +8,10 @@ import { Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const EXAMPLE_PROMPTS = [
-  "A vibrant underwater scene with colorful coral reefs, tropical fish, and dancing light beams",
+  "A serene mountain landscape with snow-capped peaks at sunset",
   "A futuristic cityscape at night with neon lights, flying cars, and towering skyscrapers",
   "A magical forest scene with glowing mushrooms, fairy lights, and mystical creatures",
-  "A cozy autumn cabin in the woods with falling leaves, smoke from the chimney, and a warm golden light"
+  "A cozy coffee shop interior with warm lighting and vintage decorations"
 ];
 
 const ImageGenerator = () => {

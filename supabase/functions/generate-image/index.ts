@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,38 +21,38 @@ serve(async (req) => {
       throw new Error('Prompt is required');
     }
 
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiKey) {
-      console.error('OpenAI API key not found');
+    const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+    if (!token) {
+      console.error('Hugging Face token not found');
       throw new Error('API configuration error');
     }
 
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: prompt,
-        n: 1,
-        size: "1024x1024",
-      }),
+    const hf = new HfInference(token);
+    console.log('Created Hugging Face inference instance');
+
+    const image = await hf.textToImage({
+      inputs: prompt,
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      parameters: {
+        num_inference_steps: 30,
+        guidance_scale: 7.5,
+      }
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('OpenAI API error:', error);
-      throw new Error(error.error?.message || 'Failed to generate image');
+    if (!image) {
+      throw new Error('No image was generated');
     }
 
-    const data = await response.json();
-    const imageUrl = data.data[0].url;
+    console.log('Image generated successfully, converting to base64');
 
-    console.log('Successfully generated image');
+    // Convert the blob to base64 string
+    const arrayBuffer = await image.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const imageUrl = `data:image/png;base64,${base64}`;
+
+    console.log('Successfully converted image to base64');
 
     return new Response(
       JSON.stringify({ imageUrl }),

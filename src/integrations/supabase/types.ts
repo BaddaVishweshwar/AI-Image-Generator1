@@ -9,6 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      generation_counts: {
+        Row: {
+          count: number | null
+          created_at: string | null
+          date: string | null
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          count?: number | null
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          count?: number | null
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_profile"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_counts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       images: {
         Row: {
           created_at: string | null
@@ -71,15 +110,74 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string
+          profile_id: string
+          start_date: string | null
+          stripe_subscription_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          profile_id: string
+          start_date?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          profile_id?: string
+          start_date?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_profile"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_generation_limit: {
+        Args: {
+          profile_id: string
+        }
+        Returns: boolean
+      }
+      increment_generation_count: {
+        Args: {
+          profile_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      subscription_tier: "free" | "daily" | "monthly" | "lifetime"
     }
     CompositeTypes: {
       [_ in never]: never

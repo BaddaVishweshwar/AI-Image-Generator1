@@ -44,6 +44,12 @@ const MainNav = () => {
               <Home className="h-4 w-4" />
               <span>Home</span>
             </Link>
+            <Link to="/subscription" className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              </svg>
+              <span>Subscription</span>
+            </Link>
             <Link to="/about" className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
               <Info className="h-4 w-4" />
               <span>About</span>

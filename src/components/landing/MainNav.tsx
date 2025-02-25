@@ -1,28 +1,101 @@
+
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Info, Mail, LogOut } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Home, Mail, Info, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import ImageHistory from "../ImageHistory";
+import { format } from "date-fns";
 
 const MainNav = () => {
   const [session, setSession] = useState<any>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [remainingImages, setRemainingImages] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const fetchSubscriptionInfo = async () => {
+      if (!session?.user) return;
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (profiles) {
+        // Get subscription info
+        const { data: subscription } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("profile_id", profiles.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        setSubscriptionInfo(subscription);
+
+        // Get remaining images for free tier
+        if (subscription?.tier === 'free') {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: counts } = await supabase
+            .from("generation_counts")
+            .select("count")
+            .eq("profile_id", profiles.id)
+            .eq("date", today)
+            .single();
+
+          setRemainingImages(5 - (counts?.count || 0));
+        }
+      }
+    };
+
+    fetchSubscriptionInfo();
+  }, [session]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const renderSubscriptionInfo = () => {
+    if (!subscriptionInfo) return null;
+
+    if (subscriptionInfo.tier === 'free') {
+      return (
+        <span className="text-sm text-gray-600">
+          {remainingImages !== null ? `${remainingImages} images left today` : 'Free tier'}
+        </span>
+      );
+    }
+
+    if (subscriptionInfo.end_date) {
+      const daysLeft = Math.ceil(
+        (new Date(subscriptionInfo.end_date).getTime() - new Date().getTime()) / 
+        (1000 * 60 * 60 * 24)
+      );
+      return (
+        <span className="text-sm text-gray-600">
+          {daysLeft > 0 ? `${daysLeft} days left` : 'Subscription ended'}
+        </span>
+      );
+    }
+
+    if (subscriptionInfo.tier === 'lifetime') {
+      return <span className="text-sm text-gray-600">Lifetime access</span>;
+    }
+
+    return null;
   };
 
   return (
@@ -63,7 +136,13 @@ const MainNav = () => {
         <div className="flex items-center space-x-4">
           {session ? (
             <>
-              <span className="text-sm text-gray-600">{session.user.email}</span>
+              <div className="flex flex-col items-end">
+                <span className="text-sm text-gray-600">{session.user.email}</span>
+                {renderSubscriptionInfo()}
+                <div className="absolute top-16 right-0 mt-2">
+                  <ImageHistory userId={session.user.id} />
+                </div>
+              </div>
               <Button
                 variant="ghost"
                 className="text-purple-600 hover:text-purple-700 hover:bg-purple-100"

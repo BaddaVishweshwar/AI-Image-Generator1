@@ -1,11 +1,8 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Mail, Info, LogOut } from "lucide-react";
+import { Home, Mail, Info, LogOut, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import ImageHistory from "../ImageHistory";
-import { format } from "date-fns";
 
 const MainNav = () => {
   const [session, setSession] = useState<any>(null);
@@ -35,7 +32,6 @@ const MainNav = () => {
         .single();
 
       if (profiles) {
-        // Get subscription info
         const { data: subscription } = await supabase
           .from("subscriptions")
           .select("*")
@@ -46,7 +42,6 @@ const MainNav = () => {
 
         setSubscriptionInfo(subscription);
 
-        // Get remaining images for free tier
         if (subscription?.tier === 'free') {
           const today = new Date().toISOString().split('T')[0];
           const { data: counts } = await supabase
@@ -123,6 +118,10 @@ const MainNav = () => {
               </svg>
               <span>Subscription</span>
             </Link>
+            <Link to="/history" className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
+              <History className="h-4 w-4" />
+              <span>History</span>
+            </Link>
             <Link to="/about" className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
               <Info className="h-4 w-4" />
               <span>About</span>
@@ -139,9 +138,6 @@ const MainNav = () => {
               <div className="flex flex-col items-end">
                 <span className="text-sm text-gray-600">{session.user.email}</span>
                 {renderSubscriptionInfo()}
-                <div className="absolute top-16 right-0 mt-2">
-                  <ImageHistory userId={session.user.id} />
-                </div>
               </div>
               <Button
                 variant="ghost"

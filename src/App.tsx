@@ -5,6 +5,7 @@ import Auth from "@/pages/Auth";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import Subscription from "@/pages/Subscription";
+import History from "@/pages/History";
 import "./App.css";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/subscription" element={<Subscription />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </Router>
   );

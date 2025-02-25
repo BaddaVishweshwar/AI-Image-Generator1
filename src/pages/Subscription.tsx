@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,31 +19,31 @@ const plans = [
     price: "Free",
     features: ["5 images per day", "Basic support", "Standard quality"],
     tier: "free",
-    priceId: null,
+    priceId: "price_1QwQ7kSE9TU4LwjhAZ8l2Bpe",
   },
   {
     name: "1 Day of Unlimited Magic",
     description: "Create nonstop for 24 hours!",
-    price: "$0.57",
+    price: "₹49",
     features: ["Unlimited generations", "24-hour access", "Priority support"],
     tier: "daily",
-    priceId: "price_1OvPKQKAQOIUUCFrXYgP8N9x",
+    priceId: "price_1QwQ8BSE9TU4LwjhFtTOKYy8",
   },
   {
     name: "30 Days of Endless Imagination",
     description: "Unleash your ideas all month",
-    price: "$2.10",
+    price: "₹149",
     features: ["Unlimited generations", "30-day access", "Priority support"],
     tier: "monthly",
-    priceId: "price_1OvPKQKAQOIUUCFr0LSHtE8K",
+    priceId: "price_1QwQ9FSE9TU4LwjhGk1ZGUB5",
   },
   {
     name: "A Lifetime of Limitless Art",
     description: "One-time pay, infinite possibilities!",
-    price: "$19.67",
+    price: "₹1,999",
     features: ["Unlimited generations", "Lifetime access", "Premium support"],
     tier: "lifetime",
-    priceId: "price_1OvPKQKAQOIUUCFrjF5XXn1m",
+    priceId: "price_1QwQATSE9TU4LwjhGmHyDOCa",
   },
 ];
 

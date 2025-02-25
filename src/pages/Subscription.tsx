@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,8 +7,9 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { loadStripe } from "@stripe/stripe-js";
+import MainNav from "@/components/landing/MainNav";
 
-const stripePromise = loadStripe("pk_test_51OvPIgKAQOIUUCFr8dze8PlDLOFah6b6kCDGYZ1jxqQ8K2Y4yra1tOXDymUk0DEaY9SlirAXIKuVb4YnvDiNEO2q00xaZ4qBBq");
+const stripePromise = loadStripe("pk_test_51Q1KaxSE9TU4LwjhqMNLmkW0TGgd4Qe5H9BfQGvvMBktpP4QQhF1PVEwjki8DagrdZjJEeGxpxH5LsW8QcLHT1P000fRKLy8F5");
 
 const plans = [
   {
@@ -142,60 +142,63 @@ const Subscription = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white py-24">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-purple-900 mb-4">Choose Your Creative Journey</h1>
-          <p className="text-lg text-gray-600">Unlock the full potential of AI-powered image generation</p>
-        </div>
+    <>
+      <MainNav />
+      <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-24">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-purple-900 mb-4">Choose Your Creative Journey</h1>
+            <p className="text-lg text-gray-600">Unlock the full potential of AI-powered image generation</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {plans.map((plan) => (
-            <Card key={plan.tier} className={`relative overflow-hidden ${
-              currentPlan?.tier === plan.tier ? "border-purple-500 border-2" : ""
-            }`}>
-              {currentPlan?.tier === plan.tier && (
-                <Badge className="absolute top-4 right-4 bg-purple-500">
-                  Current Plan
-                </Badge>
-              )}
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-                <CardDescription>{plan.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-6">{plan.price}</div>
-                <ul className="space-y-2">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center text-sm text-gray-600">
-                      <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={loading || currentPlan?.tier === plan.tier}
-                >
-                  {loading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : currentPlan?.tier === plan.tier ? (
-                    "Current Plan"
-                  ) : (
-                    "Subscribe"
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {plans.map((plan) => (
+              <Card key={plan.tier} className={`relative overflow-hidden ${
+                currentPlan?.tier === plan.tier ? "border-purple-500 border-2" : ""
+              }`}>
+                {currentPlan?.tier === plan.tier && (
+                  <Badge className="absolute top-4 right-4 bg-purple-500">
+                    Current Plan
+                  </Badge>
+                )}
+                <CardHeader>
+                  <CardTitle>{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold mb-6">{plan.price}</div>
+                  <ul className="space-y-2">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center text-sm text-gray-600">
+                        <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={loading || currentPlan?.tier === plan.tier}
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : currentPlan?.tier === plan.tier ? (
+                      "Current Plan"
+                    ) : (
+                      "Subscribe"
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

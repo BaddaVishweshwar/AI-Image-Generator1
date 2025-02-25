@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+const stripe = new Stripe('sk_test_51Q1KaxSE9TU4LwjhB2kM7krfGbukcKnuaF1W7ZphGqyYtEk1IVsdQYlM8pnjygjrEMVKGOOuPw1DSYJxOyJGkSg7003n0elohJ', {
   httpClient: Stripe.createFetchHttpClient(),
 });
 

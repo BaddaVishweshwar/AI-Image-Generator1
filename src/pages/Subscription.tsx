@@ -9,7 +9,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MainNav from "@/components/landing/MainNav";
 
-const plans = [
+type SubscriptionTier = "free" | "daily" | "monthly" | "lifetime";
+
+interface Plan {
+  name: string;
+  description: string;
+  price: string;
+  features: string[];
+  tier: SubscriptionTier;
+  amount: number;
+}
+
+const plans: Plan[] = [
   {
     name: "A Taste of Creativity",
     description: "Limited generations to ignite your creativity!",
@@ -68,19 +79,25 @@ const Subscription = () => {
 
             if (profiles) {
               // Extract tier from orderId (assuming format: tier_timestamp_random)
-              const tier = orderId.split('_')[0];
+              const tierFromOrder = orderId.split('_')[0];
+              
+              // Validate that the extracted tier is a valid SubscriptionTier
+              if (!isValidTier(tierFromOrder)) {
+                throw new Error("Invalid subscription tier");
+              }
+
               let end_date = null;
 
               // Set end date based on tier
-              if (tier === 'daily') {
+              if (tierFromOrder === 'daily') {
                 end_date = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-              } else if (tier === 'monthly') {
+              } else if (tierFromOrder === 'monthly') {
                 end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
               }
 
               const { error: subscriptionError } = await supabase.from("subscriptions").insert({
                 profile_id: profiles.id,
-                tier: tier,
+                tier: tierFromOrder as SubscriptionTier,
                 end_date: end_date,
               });
 
@@ -149,7 +166,11 @@ const Subscription = () => {
     fetchCurrentPlan();
   }, [session]);
 
-  const handleSubscribe = async (plan: typeof plans[0]) => {
+  const isValidTier = (tier: string): tier is SubscriptionTier => {
+    return ['free', 'daily', 'monthly', 'lifetime'].includes(tier);
+  };
+
+  const handleSubscribe = async (plan: Plan) => {
     if (!session) {
       navigate("/auth");
       return;

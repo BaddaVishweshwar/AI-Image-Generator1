@@ -7,10 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { loadStripe } from "@stripe/stripe-js";
 import MainNav from "@/components/landing/MainNav";
-
-const stripePromise = loadStripe("pk_test_51Q1KaxSE9TU4LwjhqMNLmkW0TGgd4Qe5H9BfQGvvMBktpP4QQhF1PVEwjki8DagrdZjJEeGxpxH5LsW8QcLHT1P000fRKLy8F5");
 
 const plans = [
   {
@@ -19,7 +16,7 @@ const plans = [
     price: "Free",
     features: ["5 images per day", "Basic support", "Standard quality"],
     tier: "free",
-    priceId: "price_1QwQ7kSE9TU4LwjhAZ8l2Bpe",
+    amount: 0,
   },
   {
     name: "1 Day of Unlimited Magic",
@@ -27,7 +24,7 @@ const plans = [
     price: "₹49",
     features: ["Unlimited generations", "24-hour access", "Priority support"],
     tier: "daily",
-    priceId: "price_1QwQ8BSE9TU4LwjhFtTOKYy8",
+    amount: 49,
   },
   {
     name: "30 Days of Endless Imagination",
@@ -35,7 +32,7 @@ const plans = [
     price: "₹149",
     features: ["Unlimited generations", "30-day access", "Priority support"],
     tier: "monthly",
-    priceId: "price_1QwQ9FSE9TU4LwjhGk1ZGUB5",
+    amount: 149,
   },
   {
     name: "A Lifetime of Limitless Art",
@@ -43,7 +40,7 @@ const plans = [
     price: "₹1,999",
     features: ["Unlimited generations", "Lifetime access", "Premium support"],
     tier: "lifetime",
-    priceId: "price_1QwQATSE9TU4LwjhGmHyDOCa",
+    amount: 1999,
   },
 ];
 
@@ -120,19 +117,20 @@ const Subscription = () => {
           setCurrentPlan({ tier: "free" });
         }
       } else {
-        const stripe = await stripePromise;
-        if (!stripe) throw new Error("Stripe failed to initialize");
-
-        const { data: response } = await supabase.functions.invoke("create-checkout-session", {
-          body: { priceId: plan.priceId }
+        const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        
+        const { data: response } = await supabase.functions.invoke("create-cashfree-order", {
+          body: { 
+            priceId: plan.tier,
+            orderId: orderId,
+            orderAmount: plan.amount,
+          }
         });
 
-        const result = await stripe.redirectToCheckout({
-          sessionId: response.sessionId,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message);
+        if (response.payment_link) {
+          window.location.href = response.payment_link;
+        } else {
+          throw new Error("Failed to create payment link");
         }
       }
     } catch (error: any) {

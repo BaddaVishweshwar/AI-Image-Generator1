@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +48,65 @@ const Subscription = () => {
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Handle payment return from Cashfree
+  useEffect(() => {
+    const handlePaymentReturn = async () => {
+      const orderId = searchParams.get('order_id');
+      const orderStatus = searchParams.get('order_status');
+
+      if (orderId && orderStatus) {
+        if (orderStatus === 'PAID') {
+          try {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("user_id", session?.user?.id)
+              .single();
+
+            if (profiles) {
+              // Extract tier from orderId (assuming format: tier_timestamp_random)
+              const tier = orderId.split('_')[0];
+              let end_date = null;
+
+              // Set end date based on tier
+              if (tier === 'daily') {
+                end_date = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+              } else if (tier === 'monthly') {
+                end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+              }
+
+              const { error: subscriptionError } = await supabase.from("subscriptions").insert({
+                profile_id: profiles.id,
+                tier: tier,
+                end_date: end_date,
+              });
+
+              if (subscriptionError) throw subscriptionError;
+
+              toast.success("Payment successful! Your subscription is now active.");
+              // Clear URL parameters
+              navigate('/subscription', { replace: true });
+              // Refresh current plan
+              fetchCurrentPlan();
+            }
+          } catch (error: any) {
+            console.error('Error updating subscription:', error);
+            toast.error("Failed to activate subscription. Please contact support.");
+          }
+        } else {
+          toast.error("Payment was not successful. Please try again.");
+          navigate('/subscription', { replace: true });
+        }
+      }
+    };
+
+    if (session) {
+      handlePaymentReturn();
+    }
+  }, [session, searchParams, navigate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -65,29 +123,29 @@ const Subscription = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchCurrentPlan = async () => {
-      if (!session) return;
+  const fetchCurrentPlan = async () => {
+    if (!session?.user?.id) return;
 
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", session.user.id)
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (profiles) {
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("profile_id", profiles.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .single();
 
-      if (profiles) {
-        const { data: subscription } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("profile_id", profiles.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+      setCurrentPlan(subscription);
+    }
+  };
 
-        setCurrentPlan(subscription);
-      }
-    };
-
+  useEffect(() => {
     fetchCurrentPlan();
   }, [session]);
 
@@ -117,15 +175,18 @@ const Subscription = () => {
           setCurrentPlan({ tier: "free" });
         }
       } else {
-        const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        // Create order ID with tier prefix for easier identification
+        const orderId = `${plan.tier}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         
-        const { data: response } = await supabase.functions.invoke("create-cashfree-order", {
+        const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
             orderId: orderId,
             orderAmount: plan.amount,
           }
         });
+
+        if (error) throw error;
 
         if (response.payment_link) {
           window.location.href = response.payment_link;
@@ -134,6 +195,7 @@ const Subscription = () => {
         }
       }
     } catch (error: any) {
+      console.error('Subscription error:', error);
       toast.error(error.message || "Failed to process subscription");
     } finally {
       setLoading(false);

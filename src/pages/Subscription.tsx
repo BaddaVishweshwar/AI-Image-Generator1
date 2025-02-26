@@ -1,10 +1,10 @@
-
 import { useSearchParams } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
 import { SubscriptionCard } from "@/components/subscription/SubscriptionCard";
+import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import MainNav from "@/components/landing/MainNav";
 import { plans } from "@/constants/plans";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -13,8 +13,34 @@ const Subscription = () => {
   const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier } = useSubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
 
-  // Handle payment return from Cashfree
+  useEffect(() => {
+    const fetchRemainingGenerations = async () => {
+      if (currentPlan?.tier === 'free') {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", currentPlan.user_id)
+          .single();
+
+        if (profiles) {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: counts } = await supabase
+            .from("generation_counts")
+            .select("count")
+            .eq("profile_id", profiles.id)
+            .eq("date", today)
+            .single();
+
+          setRemainingGenerations(5 - (counts?.count || 0));
+        }
+      }
+    };
+
+    fetchRemainingGenerations();
+  }, [currentPlan]);
+
   useEffect(() => {
     const handlePaymentReturn = async () => {
       const orderId = searchParams.get('order_id');
@@ -75,6 +101,12 @@ const Subscription = () => {
       <MainNav />
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-24">
         <div className="container mx-auto px-4">
+          {currentPlan && (
+            <SubscriptionDetails
+              currentPlan={currentPlan}
+              remainingGenerations={remainingGenerations}
+            />
+          )}
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-purple-900 mb-4">Choose Your Creative Journey</h1>
             <p className="text-lg text-gray-600">Unlock the full potential of AI-powered image generation</p>

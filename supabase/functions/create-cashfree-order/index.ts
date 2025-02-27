@@ -16,6 +16,7 @@ serve(async (req) => {
   try {
     const { priceId, orderId, orderAmount } = await req.json();
     const authHeader = req.headers.get('Authorization');
+    const origin = req.headers.get('origin') || 'https://your-domain.com';
 
     if (!authHeader) {
       throw new Error('No authorization header');
@@ -46,6 +47,10 @@ serve(async (req) => {
       throw new Error('Profile not found');
     }
 
+    // Construct return and notify URLs
+    const returnUrl = new URL('/subscription', origin).toString();
+    const notifyUrl = new URL('/subscription', origin).toString();
+
     // Create order payload for Cashfree
     const orderPayload = {
       order_id: orderId,
@@ -54,11 +59,11 @@ serve(async (req) => {
       customer_details: {
         customer_id: profile.id,
         customer_email: user.email,
-        customer_phone: "9999999999" // Required by Cashfree, using default
+        customer_phone: "9999999999"
       },
       order_meta: {
-        return_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
-        notify_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
+        return_url: returnUrl + "?order_id={order_id}&order_status={order_status}",
+        notify_url: notifyUrl + "?order_id={order_id}&order_status={order_status}"
       }
     };
 

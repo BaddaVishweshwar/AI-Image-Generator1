@@ -80,10 +80,13 @@ export const useSubscription = () => {
 
           toast.success("Successfully subscribed to free plan!");
           setCurrentPlan({ tier: "free" });
+          await fetchCurrentPlan();
         }
       } else {
+        // Create a unique order ID
         const orderId = `${plan.tier}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         
+        // Call our Edge Function to create Cashfree order
         const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
@@ -92,13 +95,17 @@ export const useSubscription = () => {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Cashfree order creation error:', error);
+          throw error;
+        }
 
-        if (response.payment_link) {
-          window.location.href = response.payment_link;
-        } else {
+        if (!response?.payment_link) {
           throw new Error("Failed to create payment link");
         }
+
+        // Redirect to Cashfree payment page
+        window.location.href = response.payment_link;
       }
     } catch (error: any) {
       console.error('Subscription error:', error);

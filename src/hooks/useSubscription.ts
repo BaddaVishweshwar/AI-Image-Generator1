@@ -29,22 +29,36 @@ export const useSubscription = () => {
   const fetchCurrentPlan = async () => {
     if (!session?.user?.id) return;
 
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_id", session.user.id)
-      .single();
-
-    if (profiles) {
-      const { data: subscription } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("profile_id", profiles.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
+    try {
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", session.user.id)
         .single();
 
-      setCurrentPlan(subscription);
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return;
+      }
+
+      if (profiles) {
+        const { data: subscription, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("profile_id", profiles.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (subscriptionError) {
+          console.error('Error fetching subscription:', subscriptionError);
+          return;
+        }
+
+        setCurrentPlan(subscription);
+      }
+    } catch (error) {
+      console.error('Error in fetchCurrentPlan:', error);
     }
   };
 
@@ -65,28 +79,31 @@ export const useSubscription = () => {
     setLoading(true);
 
     try {
-      if (plan.tier === "free") {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", session.user.id)
-          .single();
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .single();
 
-        if (profiles) {
-          await supabase.from("subscriptions").insert({
+      if (profileError) throw new Error('Could not find user profile');
+
+      if (plan.tier === "free") {
+        const { error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .insert({
             profile_id: profiles.id,
             tier: plan.tier,
           });
 
-          toast.success("Successfully subscribed to free plan!");
-          setCurrentPlan({ tier: "free" });
-          await fetchCurrentPlan();
-        }
+        if (subscriptionError) throw subscriptionError;
+
+        toast.success("Successfully subscribed to free plan!");
+        await fetchCurrentPlan();
       } else {
         // Create a unique order ID
         const orderId = `${plan.tier}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         
-        // Call our Edge Function to create Cashfree order
+        console.log('Creating Cashfree order...');
         const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
@@ -104,7 +121,7 @@ export const useSubscription = () => {
           throw new Error("Failed to create payment link");
         }
 
-        // Redirect to Cashfree payment page
+        console.log('Redirecting to payment page...');
         window.location.href = response.payment_link;
       }
     } catch (error: any) {

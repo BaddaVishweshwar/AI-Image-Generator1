@@ -7,10 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CASHFREE_APP_ID = '7549144107b7ccfe307044e304419457';
-const CASHFREE_SECRET_KEY = 'cfsk_ma_prod_b7cd0c83dfd69b3cbf1bf502a9d29b9a_e8fe128c';
-const CASHFREE_API_URL = 'https://api.cashfree.com/pg/orders'; // Using production URL
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -50,30 +46,33 @@ serve(async (req) => {
       throw new Error('Profile not found');
     }
 
+    // Create order payload for Cashfree
     const orderPayload = {
-      customer_details: {
-        customer_id: profile.id,
-        customer_email: user.email,
-      },
-      order_meta: {
-        return_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
-      },
       order_id: orderId,
       order_amount: orderAmount,
       order_currency: "INR",
+      customer_details: {
+        customer_id: profile.id,
+        customer_email: user.email,
+        customer_phone: "9999999999" // Required by Cashfree, using default
+      },
+      order_meta: {
+        return_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
+        notify_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
+      }
     };
 
     console.log('Creating order with payload:', orderPayload);
 
-    const response = await fetch(CASHFREE_API_URL, {
+    const response = await fetch('https://api.cashfree.com/pg/orders', {
       method: 'POST',
       headers: {
-        'x-client-id': CASHFREE_APP_ID,
-        'x-client-secret': CASHFREE_SECRET_KEY,
         'x-api-version': '2022-09-01',
-        'Content-Type': 'application/json',
+        'x-client-id': '7549144107b7ccfe307044e304419457',
+        'x-client-secret': 'cfsk_ma_prod_b7cd0c83dfd69b3cbf1bf502a9d29b9a_e8fe128c',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(orderPayload),
+      body: JSON.stringify(orderPayload)
     });
 
     const responseData = await response.json();
@@ -98,7 +97,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack 
+      }),
       {
         headers: {
           ...corsHeaders,

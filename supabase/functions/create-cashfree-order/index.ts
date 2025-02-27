@@ -7,6 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const CASHFREE_APP_ID = '7549144107b7ccfe307044e304419457';
+const CASHFREE_SECRET_KEY = 'cfsk_ma_prod_b7cd0c83dfd69b3cbf1bf502a9d29b9a_e8fe128c';
+const CASHFREE_API_URL = 'https://api.cashfree.com/pg/orders'; // Using production URL
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -47,28 +51,21 @@ serve(async (req) => {
     }
 
     const orderPayload = {
-      orderId: orderId,
-      orderAmount: orderAmount,
-      orderCurrency: "INR",
-      customerDetails: {
-        customerId: profile.id,
-        customerEmail: user.email,
+      customer_details: {
+        customer_id: profile.id,
+        customer_email: user.email,
       },
-      orderMeta: {
-        returnUrl: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
-      }
+      order_meta: {
+        return_url: `${req.headers.get('origin')}/subscription?order_id={order_id}&order_status={order_status}`,
+      },
+      order_id: orderId,
+      order_amount: orderAmount,
+      order_currency: "INR",
     };
 
     console.log('Creating order with payload:', orderPayload);
 
-    const CASHFREE_APP_ID = Deno.env.get('CASHFREE_APP_ID');
-    const CASHFREE_SECRET_KEY = Deno.env.get('CASHFREE_SECRET_KEY');
-
-    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      throw new Error('Missing Cashfree credentials');
-    }
-
-    const response = await fetch('https://sandbox.cashfree.com/pg/orders', {
+    const response = await fetch(CASHFREE_API_URL, {
       method: 'POST',
       headers: {
         'x-client-id': CASHFREE_APP_ID,
@@ -88,8 +85,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        payment_link: responseData.paymentLink,
-        order_id: responseData.orderId,
+        payment_link: responseData.payment_link,
+        order_id: responseData.order_id,
       }),
       {
         headers: {

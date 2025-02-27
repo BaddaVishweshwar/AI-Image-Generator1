@@ -19,6 +19,7 @@ const ImageGenerator = () => {
   const [imageUrl, setImageUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,14 +27,52 @@ const ImageGenerator = () => {
       setSession(session);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const checkRemainingGenerations = async () => {
+      if (!session?.user?.id) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (profile) {
+        // Get current subscription tier
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('tier')
+          .eq('profile_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        // Only check remaining generations for free tier
+        if (subscription?.tier === 'free') {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: count } = await supabase
+            .from('generation_counts')
+            .select('count')
+            .eq('profile_id', profile.id)
+            .eq('date', today)
+            .single();
+
+          setRemainingGenerations(5 - (count?.count || 0));
+        } else {
+          setRemainingGenerations(null); // Unlimited for paid plans
+        }
+      }
+    };
+
+    checkRemainingGenerations();
+  }, [session]);
 
   const handleDownload = async () => {
     if (!imageUrl) return;
@@ -54,6 +93,13 @@ const ImageGenerator = () => {
 
     if (!prompt) {
       toast.error("Please enter a prompt");
+      return;
+    }
+
+    // Check if user has remaining generations
+    if (remainingGenerations !== null && remainingGenerations <= 0) {
+      toast.error("You've reached your daily limit. Please upgrade your plan to generate more images.");
+      navigate("/subscription");
       return;
     }
 
@@ -103,6 +149,30 @@ const ImageGenerator = () => {
         throw new Error('Failed to save image');
       }
 
+      // Increment generation count for free tier users
+      const { data: currentSubscription } = await supabase
+        .from('subscriptions')
+        .select('tier')
+        .eq('profile_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (currentSubscription?.tier === 'free') {
+        const today = new Date().toISOString().split('T')[0];
+        await supabase.rpc('increment_generation_count', { profile_id: profile.id });
+        
+        // Update remaining generations count
+        const { data: newCount } = await supabase
+          .from('generation_counts')
+          .select('count')
+          .eq('profile_id', profile.id)
+          .eq('date', today)
+          .single();
+
+        setRemainingGenerations(5 - (newCount?.count || 0));
+      }
+
       toast.success("Image generated and saved successfully!");
     } catch (error: any) {
       console.error("Error generating image:", error);
@@ -144,6 +214,11 @@ const ImageGenerator = () => {
         <p className="text-muted-foreground">
           Turn Your Imagination Into Stunning AI-Generated Art
         </p>
+        {remainingGenerations !== null && (
+          <p className="text-sm text-gray-600">
+            {remainingGenerations} generations remaining today
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">

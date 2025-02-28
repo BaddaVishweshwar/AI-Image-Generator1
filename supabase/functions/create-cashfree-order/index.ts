@@ -17,6 +17,85 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  const path = url.pathname.split('/').pop();
+
+  // Handle webhook endpoint requests
+  if (path === 'webhook') {
+    try {
+      const webhookData = await req.json();
+      console.log('Received webhook data:', JSON.stringify(webhookData));
+      
+      // Verify the webhook signature if provided
+      // const signature = req.headers.get('x-webhook-signature');
+      // Cashfree signature validation would go here
+      
+      // Process the payment status
+      if (webhookData.data?.payment?.payment_status === 'SUCCESS') {
+        const orderId = webhookData.data.order?.order_id;
+        if (!orderId) {
+          throw new Error('Order ID not found in webhook data');
+        }
+        
+        // Extract tier from order ID (assuming format: tier_timestamp_random)
+        const tierFromOrder = orderId.split('_')[0];
+        
+        // Get profile ID from order
+        const customerId = webhookData.data.customer?.customer_id;
+        if (!customerId) {
+          throw new Error('Customer ID not found in webhook data');
+        }
+        
+        // Initialize Supabase client
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        
+        // Calculate end date based on tier
+        let end_date = null;
+        if (tierFromOrder === 'daily') {
+          end_date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        } else if (tierFromOrder === 'monthly') {
+          end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        }
+        
+        // Create subscription record
+        const { error: subscriptionError } = await supabaseClient.from("subscriptions").insert({
+          profile_id: customerId,
+          tier: tierFromOrder,
+          end_date: end_date,
+        });
+        
+        if (subscriptionError) {
+          throw new Error(`Failed to create subscription: ${subscriptionError.message}`);
+        }
+        
+        console.log(`Successfully processed webhook for order ${orderId}`);
+      }
+      
+      // Always return 200 OK to Cashfree to acknowledge receipt
+      return new Response(
+        JSON.stringify({ status: 'received' }),
+        { 
+          headers: { 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      // Still return 200 OK to prevent Cashfree from retrying
+      return new Response(
+        JSON.stringify({ status: 'error', message: error.message }),
+        { 
+          headers: { 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
+  }
+
+  // Handle regular order creation requests
   try {
     const { priceId, orderId, orderAmount } = await req.json();
     const authHeader = req.headers.get('Authorization');
@@ -59,11 +138,17 @@ serve(async (req) => {
       throw new Error('Profile not found');
     }
 
-    // Construct return and notify URLs with proper origin
+    // Construct return URL with proper origin
     const returnUrl = `${origin}/subscription`;
-    const notifyUrl = `${origin}/subscription`;
-
+    
+    // Construct webhook URL
+    // For local development, you'll need to use a service like ngrok to expose your local endpoint
+    // For production, use your actual domain
+    // Format: https://your-domain.com/functions/v1/create-cashfree-order/webhook
+    const webhookUrl = `${Deno.env.get('SUPABASE_FUNCTIONS_URL') || origin}/functions/v1/create-cashfree-order/webhook`;
+    
     console.log('Return URL:', returnUrl);
+    console.log('Webhook URL:', webhookUrl);
 
     // Create order payload for Cashfree
     const orderPayload = {
@@ -77,7 +162,7 @@ serve(async (req) => {
       },
       order_meta: {
         return_url: returnUrl + "?order_id={order_id}&order_status={order_status}",
-        notify_url: notifyUrl + "?order_id={order_id}&order_status={order_status}"
+        notify_url: webhookUrl
       }
     };
 

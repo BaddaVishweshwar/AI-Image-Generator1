@@ -1,3 +1,4 @@
+
 import { useSearchParams } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
 import { SubscriptionCard } from "@/components/subscription/SubscriptionCard";
@@ -8,12 +9,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Subscription = () => {
   const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier } = useSubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   useEffect(() => {
     const fetchRemainingGenerations = async () => {
@@ -47,8 +53,9 @@ const Subscription = () => {
       const orderStatus = searchParams.get('order_status');
 
       if (orderId && orderStatus) {
-        if (orderStatus === 'PAID') {
-          try {
+        setProcessingPayment(true);
+        try {
+          if (orderStatus === 'PAID') {
             const { data: profiles } = await supabase
               .from("profiles")
               .select("id")
@@ -82,13 +89,16 @@ const Subscription = () => {
               navigate('/subscription', { replace: true });
               fetchCurrentPlan();
             }
-          } catch (error: any) {
-            console.error('Error updating subscription:', error);
-            toast.error("Failed to activate subscription. Please contact support.");
+          } else {
+            setPaymentError(`Payment was not successful. Status: ${orderStatus}`);
+            toast.error("Payment was not successful. Please try again.");
           }
-        } else {
-          toast.error("Payment was not successful. Please try again.");
-          navigate('/subscription', { replace: true });
+        } catch (error: any) {
+          console.error('Error updating subscription:', error);
+          setPaymentError(error.message || "Failed to activate subscription");
+          toast.error("Failed to activate subscription. Please contact support.");
+        } finally {
+          setProcessingPayment(false);
         }
       }
     };
@@ -101,6 +111,24 @@ const Subscription = () => {
       <MainNav />
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-24">
         <div className="container mx-auto px-4">
+          {paymentError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Payment Error</AlertTitle>
+              <AlertDescription>{paymentError}</AlertDescription>
+              <div className="mt-2">
+                <Button variant="outline" onClick={() => setPaymentError(null)}>Dismiss</Button>
+              </div>
+            </Alert>
+          )}
+          
+          {processingPayment && (
+            <Alert className="mb-6 bg-yellow-50">
+              <AlertTitle>Processing Payment</AlertTitle>
+              <AlertDescription>Please wait while we process your payment...</AlertDescription>
+            </Alert>
+          )}
+
           {currentPlan && (
             <SubscriptionDetails
               currentPlan={currentPlan}

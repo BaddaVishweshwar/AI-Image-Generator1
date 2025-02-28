@@ -22,6 +22,14 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
+    // Get Cashfree credentials from environment
+    const appId = Deno.env.get('CASHFREE_APP_ID');
+    const secretKey = Deno.env.get('CASHFREE_SECRET_KEY');
+    
+    if (!appId || !secretKey) {
+      throw new Error('Cashfree credentials not found in environment');
+    }
+
     // Get user from token
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -51,6 +59,9 @@ serve(async (req) => {
     const returnUrl = new URL('/subscription', origin).toString();
     const notifyUrl = new URL('/subscription', origin).toString();
 
+    console.log('Return URL:', returnUrl);
+    console.log('Notify URL:', notifyUrl);
+
     // Create order payload for Cashfree
     const orderPayload = {
       order_id: orderId,
@@ -58,7 +69,7 @@ serve(async (req) => {
       order_currency: "INR",
       customer_details: {
         customer_id: profile.id,
-        customer_email: user.email,
+        customer_email: user.email || 'customer@example.com',
         customer_phone: "9999999999"
       },
       order_meta: {
@@ -67,24 +78,24 @@ serve(async (req) => {
       }
     };
 
-    console.log('Creating order with payload:', orderPayload);
+    console.log('Creating order with payload:', JSON.stringify(orderPayload));
 
     const response = await fetch('https://api.cashfree.com/pg/orders', {
       method: 'POST',
       headers: {
         'x-api-version': '2022-09-01',
-        'x-client-id': '7549144107b7ccfe307044e304419457',
-        'x-client-secret': 'cfsk_ma_prod_b7cd0c83dfd69b3cbf1bf502a9d29b9a_e8fe128c',
+        'x-client-id': appId,
+        'x-client-secret': secretKey,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(orderPayload)
     });
 
     const responseData = await response.json();
-    console.log('Cashfree response:', responseData);
+    console.log('Cashfree response:', JSON.stringify(responseData));
 
     if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to create order');
+      throw new Error(`Cashfree error: ${responseData.message || 'Failed to create order'}`);
     }
 
     return new Response(

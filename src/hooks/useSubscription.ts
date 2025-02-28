@@ -42,20 +42,55 @@ export const useSubscription = () => {
       }
 
       if (profiles) {
+        // First check if there's an active subscription with an end_date in the future or null
+        const now = new Date().toISOString();
+        const { data: activeSubscription, error: activeSubError } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("profile_id", profiles.id)
+          .or(`end_date.gt.${now},end_date.is.null`)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeSubError) {
+          console.error('Error fetching active subscription:', activeSubError);
+        }
+
+        if (activeSubscription) {
+          setCurrentPlan({
+            ...activeSubscription,
+            user_id: session.user.id
+          });
+          return;
+        }
+
+        // If no active subscription, get the most recent one of any kind
         const { data: subscription, error: subscriptionError } = await supabase
           .from("subscriptions")
           .select("*")
           .eq("profile_id", profiles.id)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (subscriptionError) {
           console.error('Error fetching subscription:', subscriptionError);
-          return;
         }
 
-        setCurrentPlan(subscription);
+        if (subscription) {
+          setCurrentPlan({
+            ...subscription,
+            user_id: session.user.id
+          });
+        } else {
+          // No subscription at all, set to free tier
+          setCurrentPlan({
+            tier: 'free',
+            user_id: session.user.id,
+            end_date: null
+          });
+        }
       }
     } catch (error) {
       console.error('Error in fetchCurrentPlan:', error);
@@ -118,15 +153,16 @@ export const useSubscription = () => {
         }
 
         if (!response?.payment_link) {
-          throw new Error("Failed to create payment link");
+          throw new Error("Failed to create payment link: " + JSON.stringify(response));
         }
 
-        console.log('Redirecting to payment page...');
+        console.log('Redirecting to payment page:', response.payment_link);
         window.location.href = response.payment_link;
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
-      toast.error(error.message || "Failed to process subscription");
+      const errorMessage = error.message || "Failed to process subscription";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

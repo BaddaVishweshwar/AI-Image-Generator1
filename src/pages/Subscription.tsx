@@ -23,24 +23,16 @@ const Subscription = () => {
 
   useEffect(() => {
     const fetchRemainingGenerations = async () => {
-      if (currentPlan?.tier === 'free') {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", currentPlan.user_id)
+      if (currentPlan?.tier === 'free' && currentPlan?.profile_id) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: counts } = await supabase
+          .from("generation_counts")
+          .select("count")
+          .eq("profile_id", currentPlan.profile_id)
+          .eq("date", today)
           .single();
 
-        if (profiles) {
-          const today = new Date().toISOString().split('T')[0];
-          const { data: counts } = await supabase
-            .from("generation_counts")
-            .select("count")
-            .eq("profile_id", profiles.id)
-            .eq("date", today)
-            .single();
-
-          setRemainingGenerations(5 - (counts?.count || 0));
-        }
+        setRemainingGenerations(5 - (counts?.count || 0));
       }
     };
 
@@ -56,39 +48,35 @@ const Subscription = () => {
         setProcessingPayment(true);
         try {
           if (orderStatus === 'PAID') {
-            const { data: profiles } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("user_id", currentPlan?.user_id)
-              .single();
-
-            if (profiles) {
-              const tierFromOrder = orderId.split('_')[0];
-              
-              if (!isValidTier(tierFromOrder)) {
-                throw new Error("Invalid subscription tier");
-              }
-
-              let end_date = null;
-
-              if (tierFromOrder === 'daily') {
-                end_date = new Date(Date.now() + 24 * 60 * 60 * 1000);
-              } else if (tierFromOrder === 'monthly') {
-                end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-              }
-
-              const { error: subscriptionError } = await supabase.from("subscriptions").insert({
-                profile_id: profiles.id,
-                tier: tierFromOrder,
-                end_date: end_date,
-              });
-
-              if (subscriptionError) throw subscriptionError;
-
-              toast.success("Payment successful! Your subscription is now active.");
-              navigate('/subscription', { replace: true });
-              fetchCurrentPlan();
+            if (!currentPlan?.profile_id) {
+              throw new Error("Profile ID not found");
             }
+
+            const tierFromOrder = orderId.split('_')[0];
+            
+            if (!isValidTier(tierFromOrder)) {
+              throw new Error("Invalid subscription tier");
+            }
+
+            let end_date = null;
+
+            if (tierFromOrder === 'daily') {
+              end_date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            } else if (tierFromOrder === 'monthly') {
+              end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            }
+
+            const { error: subscriptionError } = await supabase.from("subscriptions").insert({
+              profile_id: currentPlan.profile_id,
+              tier: tierFromOrder,
+              end_date: end_date,
+            });
+
+            if (subscriptionError) throw subscriptionError;
+
+            toast.success("Payment successful! Your subscription is now active.");
+            navigate('/subscription', { replace: true });
+            fetchCurrentPlan();
           } else {
             setPaymentError(`Payment was not successful. Status: ${orderStatus}`);
             toast.error("Payment was not successful. Please try again.");
@@ -104,7 +92,7 @@ const Subscription = () => {
     };
 
     handlePaymentReturn();
-  }, [searchParams, navigate, currentPlan?.user_id, fetchCurrentPlan, isValidTier]);
+  }, [searchParams, navigate, currentPlan, fetchCurrentPlan, isValidTier]);
 
   return (
     <>

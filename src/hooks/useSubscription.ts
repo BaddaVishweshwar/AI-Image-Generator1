@@ -60,7 +60,8 @@ export const useSubscription = () => {
         if (activeSubscription) {
           setCurrentPlan({
             ...activeSubscription,
-            user_id: session.user.id
+            user_id: session.user.id,
+            profile_id: profiles.id  // Add profile_id to currentPlan
           });
           return;
         }
@@ -81,13 +82,15 @@ export const useSubscription = () => {
         if (subscription) {
           setCurrentPlan({
             ...subscription,
-            user_id: session.user.id
+            user_id: session.user.id,
+            profile_id: profiles.id  // Add profile_id to currentPlan
           });
         } else {
           // No subscription at all, set to free tier
           setCurrentPlan({
             tier: 'free',
             user_id: session.user.id,
+            profile_id: profiles.id,  // Add profile_id to currentPlan
             end_date: null
           });
         }

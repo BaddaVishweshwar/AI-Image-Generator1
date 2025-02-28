@@ -138,17 +138,18 @@ serve(async (req) => {
       throw new Error('Profile not found');
     }
 
+    // Get the base URL for Supabase Functions
+    const baseUrl = url.origin;
+    console.log('Base URL:', baseUrl);
+    
     // Construct return URL with proper origin
     const returnUrl = `${origin}/subscription`;
     
     // Construct webhook URL
-    // For local development, you'll need to use a service like ngrok to expose your local endpoint
-    // For production, use your actual domain
-    // Format: https://your-domain.com/functions/v1/create-cashfree-order/webhook
-    const webhookUrl = `${Deno.env.get('SUPABASE_FUNCTIONS_URL') || origin}/functions/v1/create-cashfree-order/webhook`;
+    const webhookUrl = `${baseUrl}/webhook`;
     
     console.log('Return URL:', returnUrl);
-    console.log('Webhook URL:', webhookUrl);
+    console.log('COPY THIS WEBHOOK URL FOR CASHFREE:', webhookUrl);
 
     // Create order payload for Cashfree
     const orderPayload = {
@@ -190,6 +191,7 @@ serve(async (req) => {
       JSON.stringify({
         payment_link: responseData.payment_link,
         order_id: responseData.order_id,
+        webhook_url: webhookUrl, // Return the webhook URL in the response
       }),
       {
         headers: {

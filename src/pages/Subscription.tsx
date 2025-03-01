@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 const Subscription = () => {
   const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier, remainingGenerations } = useSubscription();
@@ -97,6 +97,7 @@ const Subscription = () => {
           
           {processingPayment && (
             <Alert className="mb-6 bg-yellow-50">
+              <Loader2 className="h-4 w-4 animate-spin" />
               <AlertTitle>Processing Payment</AlertTitle>
               <AlertDescription>Please wait while we process your payment...</AlertDescription>
             </Alert>

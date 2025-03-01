@@ -56,6 +56,21 @@ const ImageGenerator = () => {
     fetchProfile();
   }, [session]);
 
+  // Refresh the current plan and remaining generations periodically
+  useEffect(() => {
+    if (currentPlan?.profile_id && currentPlan.tier === 'free') {
+      // Initial fetch
+      fetchRemainingGenerations(currentPlan.profile_id);
+      
+      // Refresh every 30 seconds
+      const interval = setInterval(() => {
+        fetchRemainingGenerations(currentPlan.profile_id);
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentPlan, fetchRemainingGenerations]);
+
   const handleDownload = async () => {
     if (!imageUrl) return;
 
@@ -121,7 +136,13 @@ const ImageGenerator = () => {
 
       // If user is on free tier, increment generation count
       if (currentPlan?.tier === 'free') {
-        await supabase.rpc('increment_generation_count', { profile_id: profile.id });
+        const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
+          profile_id: profile.id 
+        });
+        
+        if (incrementError) {
+          console.error("Error incrementing count:", incrementError);
+        }
         
         // Update remaining generations count
         if (currentPlan.profile_id) {
@@ -171,9 +192,9 @@ const ImageGenerator = () => {
         <p className="text-muted-foreground">
           Turn Your Imagination Into Stunning AI-Generated Art
         </p>
-        {currentPlan?.tier === 'free' && remainingGenerations !== null && (
+        {currentPlan?.tier === 'free' && (
           <p className="text-sm font-medium text-amber-600">
-            {remainingGenerations} images remaining today
+            {remainingGenerations !== null ? `${remainingGenerations} images remaining today` : 'Loading...'}
           </p>
         )}
       </div>

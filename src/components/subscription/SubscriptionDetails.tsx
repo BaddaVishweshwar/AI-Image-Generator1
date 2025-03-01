@@ -7,7 +7,7 @@ interface SubscriptionDetailsProps {
     tier: string;
     end_date: string | null;
   } | null;
-  remainingGenerations?: number;
+  remainingGenerations?: number | null;
 }
 
 export const SubscriptionDetails = ({ currentPlan, remainingGenerations }: SubscriptionDetailsProps) => {
@@ -18,7 +18,9 @@ export const SubscriptionDetails = ({ currentPlan, remainingGenerations }: Subsc
       case 'free':
         return {
           title: 'Free Plan',
-          limit: `${remainingGenerations ?? 5} images remaining today`,
+          limit: remainingGenerations !== null 
+            ? `${remainingGenerations} images remaining today` 
+            : 'Loading...',
         };
       case 'daily':
         return {

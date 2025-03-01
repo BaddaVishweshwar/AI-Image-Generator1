@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -38,26 +39,45 @@ const MainNav = () => {
           .eq("profile_id", profiles.id)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         setSubscriptionInfo(subscription);
 
         if (subscription?.tier === 'free') {
-          const today = new Date().toISOString().split('T')[0];
-          const { data: counts } = await supabase
-            .from("generation_counts")
-            .select("count")
-            .eq("profile_id", profiles.id)
-            .eq("date", today)
-            .single();
-
-          setRemainingImages(5 - (counts?.count || 0));
+          await fetchRemainingImages(profiles.id);
+          
+          // Set up interval to refresh remaining images count
+          const interval = setInterval(() => {
+            fetchRemainingImages(profiles.id);
+          }, 30000); // Every 30 seconds
+          
+          return () => clearInterval(interval);
         }
       }
     };
 
     fetchSubscriptionInfo();
   }, [session]);
+
+  const fetchRemainingImages = async (profileId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from("generation_counts")
+        .select("count")
+        .eq("profile_id", profileId)
+        .eq("date", today)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching counts:', error);
+      }
+
+      setRemainingImages(5 - (data?.count || 0));
+    } catch (error) {
+      console.error('Error fetching remaining images:', error);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

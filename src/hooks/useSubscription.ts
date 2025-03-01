@@ -121,20 +121,26 @@ export const useSubscription = () => {
   const fetchRemainingGenerations = async (profileId: string) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { data: counts, error } = await supabase
+      
+      // Fix: Use proper query structure - don't use profile_id as a URL parameter
+      const { data, error } = await supabase
         .from("generation_counts")
         .select("count")
         .eq("profile_id", profileId)
         .eq("date", today)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      if (error) {
         console.error('Error fetching generation counts:', error);
+        setRemainingGenerations(5); // Default to 5 if there's an error
+        return;
       }
 
-      setRemainingGenerations(5 - (counts?.count || 0));
+      const usedCount = data?.count || 0;
+      setRemainingGenerations(5 - usedCount);
     } catch (error) {
       console.error('Error in fetchRemainingGenerations:', error);
+      setRemainingGenerations(5); // Default to 5 if there's an error
     }
   };
 
@@ -182,11 +188,16 @@ export const useSubscription = () => {
         const orderId = `${plan.tier}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         
         console.log('Creating Cashfree order...');
+        
+        // Add the customer's email to the request for better identification in Cashfree
         const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
             orderId: orderId,
             orderAmount: plan.amount,
+            customerEmail: session.user.email,
+            customerName: session.user.email.split('@')[0], // Use part of email as name
+            profileId: profiles.id
           }
         });
 

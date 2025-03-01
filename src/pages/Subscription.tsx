@@ -14,30 +14,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 const Subscription = () => {
-  const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier } = useSubscription();
+  const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier, remainingGenerations } = useSubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
-
-  useEffect(() => {
-    const fetchRemainingGenerations = async () => {
-      if (currentPlan?.tier === 'free' && currentPlan?.profile_id) {
-        const today = new Date().toISOString().split('T')[0];
-        const { data: counts } = await supabase
-          .from("generation_counts")
-          .select("count")
-          .eq("profile_id", currentPlan.profile_id)
-          .eq("date", today)
-          .single();
-
-        setRemainingGenerations(5 - (counts?.count || 0));
-      }
-    };
-
-    fetchRemainingGenerations();
-  }, [currentPlan]);
 
   useEffect(() => {
     const handlePaymentReturn = async () => {
@@ -61,9 +42,13 @@ const Subscription = () => {
             let end_date = null;
 
             if (tierFromOrder === 'daily') {
-              end_date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+              const date = new Date();
+              date.setDate(date.getDate() + 1); // Add 1 day
+              end_date = date.toISOString();
             } else if (tierFromOrder === 'monthly') {
-              end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              const date = new Date();
+              date.setDate(date.getDate() + 30); // Add 30 days
+              end_date = date.toISOString();
             }
 
             const { error: subscriptionError } = await supabase.from("subscriptions").insert({
@@ -76,7 +61,7 @@ const Subscription = () => {
 
             toast.success("Payment successful! Your subscription is now active.");
             navigate('/subscription', { replace: true });
-            fetchCurrentPlan();
+            await fetchCurrentPlan();
           } else {
             setPaymentError(`Payment was not successful. Status: ${orderStatus}`);
             toast.error("Payment was not successful. Please try again.");

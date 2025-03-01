@@ -9,6 +9,7 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
+  const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,8 +62,15 @@ export const useSubscription = () => {
           setCurrentPlan({
             ...activeSubscription,
             user_id: session.user.id,
-            profile_id: profiles.id  // Add profile_id to currentPlan
+            profile_id: profiles.id
           });
+          
+          // Fetch remaining generations for free tier
+          if (activeSubscription.tier === 'free') {
+            await fetchRemainingGenerations(profiles.id);
+          } else {
+            setRemainingGenerations(null);
+          }
           return;
         }
 
@@ -83,16 +91,26 @@ export const useSubscription = () => {
           setCurrentPlan({
             ...subscription,
             user_id: session.user.id,
-            profile_id: profiles.id  // Add profile_id to currentPlan
+            profile_id: profiles.id
           });
+          
+          // Fetch remaining generations for free tier
+          if (subscription.tier === 'free') {
+            await fetchRemainingGenerations(profiles.id);
+          } else {
+            setRemainingGenerations(null);
+          }
         } else {
           // No subscription at all, set to free tier
           setCurrentPlan({
             tier: 'free',
             user_id: session.user.id,
-            profile_id: profiles.id,  // Add profile_id to currentPlan
+            profile_id: profiles.id,
             end_date: null
           });
+          
+          // Fetch remaining generations for free tier
+          await fetchRemainingGenerations(profiles.id);
         }
       }
     } catch (error) {
@@ -100,8 +118,30 @@ export const useSubscription = () => {
     }
   };
 
+  const fetchRemainingGenerations = async (profileId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: counts, error } = await supabase
+        .from("generation_counts")
+        .select("count")
+        .eq("profile_id", profileId)
+        .eq("date", today)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error fetching generation counts:', error);
+      }
+
+      setRemainingGenerations(5 - (counts?.count || 0));
+    } catch (error) {
+      console.error('Error in fetchRemainingGenerations:', error);
+    }
+  };
+
   useEffect(() => {
-    fetchCurrentPlan();
+    if (session) {
+      fetchCurrentPlan();
+    }
   }, [session]);
 
   const isValidTier = (tier: string): tier is SubscriptionTier => {
@@ -178,5 +218,7 @@ export const useSubscription = () => {
     handleSubscribe,
     fetchCurrentPlan,
     isValidTier,
+    remainingGenerations,
+    fetchRemainingGenerations
   };
 };

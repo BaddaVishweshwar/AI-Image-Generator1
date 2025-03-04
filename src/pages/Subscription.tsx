@@ -6,7 +6,6 @@ import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetai
 import MainNav from "@/components/landing/MainNav";
 import { plans } from "@/constants/plans";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,54 +21,26 @@ const Subscription = () => {
 
   useEffect(() => {
     const handlePaymentReturn = async () => {
-      const orderId = searchParams.get('order_id');
-      const orderStatus = searchParams.get('order_status');
+      const success = searchParams.get('success') === 'true';
+      const canceled = searchParams.get('canceled') === 'true';
 
-      if (orderId && orderStatus) {
+      if (success || canceled) {
         setProcessingPayment(true);
         try {
-          if (orderStatus === 'PAID') {
-            if (!currentPlan?.profile_id) {
-              throw new Error("Profile ID not found");
-            }
-
-            const tierFromOrder = orderId.split('_')[0];
-            
-            if (!isValidTier(tierFromOrder)) {
-              throw new Error("Invalid subscription tier");
-            }
-
-            let end_date = null;
-
-            if (tierFromOrder === 'daily') {
-              const date = new Date();
-              date.setDate(date.getDate() + 1); // Add 1 day
-              end_date = date.toISOString();
-            } else if (tierFromOrder === 'monthly') {
-              const date = new Date();
-              date.setDate(date.getDate() + 30); // Add 30 days
-              end_date = date.toISOString();
-            }
-
-            const { error: subscriptionError } = await supabase.from("subscriptions").insert({
-              profile_id: currentPlan.profile_id,
-              tier: tierFromOrder,
-              end_date: end_date,
-            });
-
-            if (subscriptionError) throw subscriptionError;
-
-            toast.success("Payment successful! Your subscription is now active.");
-            navigate('/subscription', { replace: true });
+          if (success) {
+            // Paddle payments are handled asynchronously by the webhook
+            // So we just need to show a success message and refresh the subscription
+            toast.success("Payment received! Your subscription will be activated shortly.");
             await fetchCurrentPlan();
-          } else {
-            setPaymentError(`Payment was not successful. Status: ${orderStatus}`);
-            toast.error("Payment was not successful. Please try again.");
+            navigate('/subscription', { replace: true });
+          } else if (canceled) {
+            setPaymentError("Payment was canceled. Please try again.");
+            toast.error("Payment was canceled. Please try again.");
           }
         } catch (error: any) {
-          console.error('Error updating subscription:', error);
-          setPaymentError(error.message || "Failed to activate subscription");
-          toast.error("Failed to activate subscription. Please contact support.");
+          console.error('Error handling payment return:', error);
+          setPaymentError(error.message || "Failed to process payment result");
+          toast.error("Failed to process payment result. Please contact support.");
         } finally {
           setProcessingPayment(false);
         }
@@ -77,7 +48,7 @@ const Subscription = () => {
     };
 
     handlePaymentReturn();
-  }, [searchParams, navigate, currentPlan, fetchCurrentPlan, isValidTier]);
+  }, [searchParams, navigate, fetchCurrentPlan]);
 
   const handleRetry = () => {
     setPaymentError(null);

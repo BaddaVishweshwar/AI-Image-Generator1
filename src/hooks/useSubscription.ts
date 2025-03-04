@@ -195,32 +195,32 @@ export const useSubscription = () => {
         toast.success("Successfully subscribed to free plan!");
         await fetchCurrentPlan();
       } else {
-        // Create a unique order ID with better entropy
-        const orderId = `${plan.tier}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-        
-        console.log('Creating Cashfree order...');
-        
-        // Get user details for better Cashfree integration
+        // Get user details for Paddle
         let customerName = profiles.display_name || 
                          (session.user.email ? session.user.email.split('@')[0] : 'User');
         const customerEmail = session.user.email || 'unknown@example.com';
         
-        // Add more detailed customer information and error handling
+        // Create success and cancel URLs
+        const origin = window.location.origin;
+        const successUrl = `${origin}/subscription?success=true`;
+        const cancelUrl = `${origin}/subscription?canceled=true`;
+        
+        console.log('Creating Paddle checkout...');
+        
         try {
-          const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
+          const { data: response, error } = await supabase.functions.invoke("create-paddle-order", {
             body: { 
               priceId: plan.tier,
-              orderId: orderId,
-              orderAmount: plan.amount,
               customerEmail: customerEmail,
               customerName: customerName,
-              customerPhone: '9999999999', // Add a default phone as Cashfree might require it
-              profileId: profiles.id
+              profileId: profiles.id,
+              successUrl: successUrl,
+              cancelUrl: cancelUrl
             }
           });
 
           if (error) {
-            console.error('Cashfree order creation error:', error);
+            console.error('Paddle checkout creation error:', error);
             throw new Error(`Payment service error: ${error.message}`);
           }
 
@@ -228,7 +228,7 @@ export const useSubscription = () => {
             throw new Error("Failed to create payment link: " + JSON.stringify(response));
           }
 
-          console.log('Redirecting to payment page:', response.payment_link);
+          console.log('Redirecting to Paddle checkout:', response.payment_link);
           window.location.href = response.payment_link;
         } catch (error) {
           console.error("Failed to create payment order:", error);

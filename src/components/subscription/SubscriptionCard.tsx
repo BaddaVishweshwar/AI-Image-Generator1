@@ -61,7 +61,7 @@ export const SubscriptionCard = ({
           ) : isCurrentPlan ? (
             "Current Plan"
           ) : isPaid ? (
-            "Subscribe"
+            "Subscribe with Paddle"
           ) : (
             "Get Free Plan"
           )}

@@ -18,6 +18,8 @@ export const SubscriptionCard = ({
   isLoading,
   onSubscribe,
 }: SubscriptionCardProps) => {
+  const isPaid = plan.tier !== 'free';
+  
   return (
     <Card className={`relative overflow-hidden ${
       isCurrentPlan ? "border-purple-500 border-2" : ""
@@ -46,16 +48,22 @@ export const SubscriptionCard = ({
       </CardContent>
       <CardFooter>
         <Button
+          variant={isPaid ? "default" : "secondary"}
           className="w-full"
           onClick={() => onSubscribe(plan)}
           disabled={isLoading || isCurrentPlan}
         >
           {isLoading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {isPaid ? "Processing Payment..." : "Subscribing..."}
+            </>
           ) : isCurrentPlan ? (
             "Current Plan"
-          ) : (
+          ) : isPaid ? (
             "Subscribe"
+          ) : (
+            "Get Free Plan"
           )}
         </Button>
       </CardFooter>

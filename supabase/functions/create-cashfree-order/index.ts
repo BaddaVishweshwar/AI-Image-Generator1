@@ -14,6 +14,9 @@ serve(async (req) => {
   }
 
   try {
+    const requestData = await req.json();
+    console.log("Order request received:", requestData);
+
     const {
       orderId,
       orderAmount,
@@ -22,29 +25,32 @@ serve(async (req) => {
       customerPhone,
       priceId,
       profileId
-    } = await req.json();
+    } = requestData;
 
-    console.log("Order request received:", {
-      orderId,
-      orderAmount,
-      customerName,
-      customerEmail,
-      priceId,
-      profileId
-    });
-
-    // Input validation
-    if (!orderId || !orderAmount || !customerEmail || !priceId || !profileId) {
-      throw new Error("Missing required parameters");
+    // Input validation with detailed error messages
+    if (!orderId) {
+      throw new Error("Missing required parameter: orderId");
+    }
+    if (!orderAmount) {
+      throw new Error("Missing required parameter: orderAmount");
+    }
+    if (!customerEmail) {
+      throw new Error("Missing required parameter: customerEmail");
+    }
+    if (!priceId) {
+      throw new Error("Missing required parameter: priceId");
+    }
+    if (!profileId) {
+      throw new Error("Missing required parameter: profileId");
     }
 
     // Additional data validation
     if (typeof orderAmount !== 'number' || orderAmount <= 0) {
-      throw new Error("Invalid order amount");
+      throw new Error("Invalid order amount: must be a positive number");
     }
 
     if (!['daily', 'monthly', 'lifetime'].includes(priceId)) {
-      throw new Error("Invalid subscription tier");
+      throw new Error(`Invalid subscription tier: ${priceId}`);
     }
 
     // Get Supabase API keys from environment variables
@@ -68,15 +74,15 @@ serve(async (req) => {
 
     console.log("Creating Cashfree order...");
 
-    // Create the return URL with the profile ID
-    const returnUrl = `${req.headers.get('origin') || 'https://localhost:5173'}/subscription?order_id=${orderId}&order_status={order_status}`;
+    // Create the return URL with the profile ID and encode it properly
+    const returnUrl = `${req.headers.get('origin') || 'https://localhost:5173'}/subscription?order_id=${encodeURIComponent(orderId)}&order_status={order_status}`;
 
     console.log("Return URL:", returnUrl);
 
-    // API endpoint for Cashfree order creation
+    // API endpoint for Cashfree order creation - using sandbox for testing
     const apiEndpoint = "https://sandbox.cashfree.com/pg/orders";
 
-    // Prepare the order payload
+    // Prepare the order payload with sanitized values
     const orderPayload = {
       order_id: orderId,
       order_amount: orderAmount,
@@ -94,9 +100,9 @@ serve(async (req) => {
       },
     };
 
-    console.log("Order payload:", orderPayload);
+    console.log("Order payload:", JSON.stringify(orderPayload));
 
-    // Send the request to Cashfree
+    // Send the request to Cashfree with proper error handling
     const response = await fetch(apiEndpoint, {
       method: "POST",
       headers: {
@@ -108,15 +114,26 @@ serve(async (req) => {
       body: JSON.stringify(orderPayload),
     });
 
+    // Get the response body for better error handling
+    const responseBody = await response.text();
+    console.log("Cashfree API response:", response.status, responseBody);
+
     // Check if the request was successful
     if (!response.ok) {
-      const errorDetails = await response.text();
-      console.error("Cashfree API error:", response.status, errorDetails);
-      throw new Error(`Cashfree API error: ${response.status} - ${errorDetails}`);
+      throw new Error(`Cashfree API error: ${response.status} - ${responseBody}`);
     }
 
-    // Parse the response
-    const paymentData = await response.json();
+    // Parse the response (safely)
+    let paymentData;
+    try {
+      paymentData = JSON.parse(responseBody);
+    } catch (e) {
+      throw new Error(`Failed to parse Cashfree response: ${e.message}`);
+    }
+    
+    if (!paymentData.payment_link) {
+      throw new Error("No payment link returned from Cashfree");
+    }
     
     console.log("Cashfree order created successfully:", paymentData);
 

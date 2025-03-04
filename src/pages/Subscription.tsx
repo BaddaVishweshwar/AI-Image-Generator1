@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 const Subscription = () => {
   const { loading, currentPlan, handleSubscribe, fetchCurrentPlan, isValidTier, remainingGenerations } = useSubscription();
@@ -79,6 +79,12 @@ const Subscription = () => {
     handlePaymentReturn();
   }, [searchParams, navigate, currentPlan, fetchCurrentPlan, isValidTier]);
 
+  const handleRetry = () => {
+    setPaymentError(null);
+    // Force refresh the page to clear any cached state
+    window.location.href = '/subscription';
+  };
+
   return (
     <>
       <MainNav />
@@ -89,8 +95,12 @@ const Subscription = () => {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Payment Error</AlertTitle>
               <AlertDescription>{paymentError}</AlertDescription>
-              <div className="mt-2">
+              <div className="mt-2 flex space-x-2">
                 <Button variant="outline" onClick={() => setPaymentError(null)}>Dismiss</Button>
+                <Button variant="default" onClick={handleRetry} className="flex items-center">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Try Again
+                </Button>
               </div>
             </Alert>
           )}

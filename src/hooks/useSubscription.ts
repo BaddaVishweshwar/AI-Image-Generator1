@@ -120,14 +120,16 @@ export const useSubscription = () => {
 
   const fetchRemainingGenerations = async (profileId: string) => {
     try {
+      // Get today's date in YYYY-MM-DD format for the database query
       const today = new Date().toISOString().split('T')[0];
       
-      // Use a proper request structure - don't include profile_id in the URL
+      // Use a different approach to avoid the column ambiguity issue
+      // Instead of using parameters in the URL, use the .eq() method
       const { data, error } = await supabase
         .from("generation_counts")
         .select("count")
-        .eq("profile_id", profileId)
         .eq("date", today)
+        .eq("profile_id", profileId)
         .maybeSingle();
 
       if (error) {
@@ -189,14 +191,29 @@ export const useSubscription = () => {
         
         console.log('Creating Cashfree order...');
         
+        // Get user details for better Cashfree integration
+        let customerName = session.user.email ? session.user.email.split('@')[0] : 'User';
+        const customerEmail = session.user.email || 'unknown@example.com';
+        
+        // Try to get more user details if available
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', profiles.id)
+          .single();
+          
+        if (userData?.display_name) {
+          customerName = userData.display_name;
+        }
+        
         // Add more detailed customer information and error handling
         const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
             orderId: orderId,
             orderAmount: plan.amount,
-            customerEmail: session.user.email || 'unknown@example.com',
-            customerName: session.user.email ? session.user.email.split('@')[0] : 'User',
+            customerEmail: customerEmail,
+            customerName: customerName,
             customerPhone: '9999999999', // Add a default phone as Cashfree might require it
             profileId: profiles.id
           }

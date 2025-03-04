@@ -15,10 +15,14 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, profileId } = await req.json();
     
     if (!prompt) {
       throw new Error('Prompt is required');
+    }
+
+    if (!profileId) {
+      throw new Error('Profile ID is required');
     }
 
     const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
@@ -27,7 +31,7 @@ serve(async (req) => {
       throw new Error('API configuration error');
     }
 
-    console.log('Generating image for prompt:', prompt);
+    console.log('Generating image for prompt:', prompt, 'Profile ID:', profileId);
 
     const hf = new HfInference(token);
     console.log('Created Hugging Face inference instance');

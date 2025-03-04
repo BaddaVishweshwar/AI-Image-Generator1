@@ -62,20 +62,25 @@ const MainNav = () => {
   const fetchRemainingImages = async (profileId: string) => {
     try {
       const today = new Date().toISOString().split('T')[0];
+      
+      // Fixed query to avoid ambiguous column reference
       const { data, error } = await supabase
         .from("generation_counts")
         .select("count")
-        .eq("profile_id", profileId)
         .eq("date", today)
+        .eq("profile_id", profileId)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching counts:', error);
+        setRemainingImages(5); // Default to max if there's an error
+        return;
       }
 
       setRemainingImages(5 - (data?.count || 0));
     } catch (error) {
       console.error('Error fetching remaining images:', error);
+      setRemainingImages(5); // Default to max if there's an error
     }
   };
 

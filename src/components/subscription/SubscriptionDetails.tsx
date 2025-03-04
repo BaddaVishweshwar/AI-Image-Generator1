@@ -1,6 +1,7 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SubscriptionDetailsProps {
   currentPlan: {
@@ -19,8 +20,8 @@ export const SubscriptionDetails = ({ currentPlan, remainingGenerations }: Subsc
         return {
           title: 'Free Plan',
           limit: remainingGenerations !== null 
-            ? `${remainingGenerations} images remaining today` 
-            : 'Loading...',
+            ? `${remainingGenerations} ${remainingGenerations === 1 ? 'image' : 'images'} remaining today` 
+            : <Skeleton className="h-4 w-32" />,
         };
       case 'daily':
         return {
@@ -57,7 +58,7 @@ export const SubscriptionDetails = ({ currentPlan, remainingGenerations }: Subsc
       <CardContent>
         <div className="space-y-2">
           <p className="text-lg font-semibold text-purple-700">{details.title}</p>
-          <p className="text-gray-600">{details.limit}</p>
+          <div className="text-gray-600">{details.limit}</div>
         </div>
       </CardContent>
     </Card>

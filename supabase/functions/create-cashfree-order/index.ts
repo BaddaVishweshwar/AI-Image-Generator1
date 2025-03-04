@@ -1,144 +1,128 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 
+// Define CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
-const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID") || "";
-const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY") || "";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-// For Cashfree testing environment, change to "https://api.cashfree.com" for production
-const CASHFREE_API_URL = "https://sandbox.cashfree.com/pg";
+// Handle preflight CORS requests
+function handleCors(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
+    })
+  }
+  return null
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    // Create Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const adminSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Handle CORS
+    const corsResponse = handleCors(req)
+    if (corsResponse) {
+      return corsResponse
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get required secrets from environment
+    const appId = Deno.env.get("CASHFREE_APP_ID")
+    const secretKey = Deno.env.get("CASHFREE_SECRET_KEY")
 
-    if (authError || !user) {
-      console.error("Auth error:", authError);
-      return new Response(JSON.stringify({ error: "Authentication failed" }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!appId || !secretKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing Cashfree credentials" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      )
     }
 
-    // Get request body
-    const { priceId, orderId, orderAmount, customerEmail, customerName, profileId } = await req.json();
+    const { priceId, orderId, orderAmount, customerEmail, customerName, customerPhone, profileId } = await req.json()
 
-    if (!priceId || !orderId || !orderAmount) {
-      return new Response(JSON.stringify({ error: "Missing required parameters" }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Validate the request
+    if (!priceId || !orderId || !orderAmount || !customerEmail || !profileId) {
+      console.error("Validation failed:", { priceId, orderId, orderAmount, customerEmail, profileId })
+      return new Response(
+        JSON.stringify({ error: "Missing required parameters" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      )
     }
 
-    if (!['daily', 'monthly', 'lifetime'].includes(priceId)) {
-      return new Response(JSON.stringify({ error: "Invalid subscription tier" }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Build the return URL (add both success and failure return paths)
-    const returnUrl = new URL(req.url);
-    returnUrl.pathname = "";
-    returnUrl.search = "";
-    returnUrl.hash = "";
+    // Prepare data for Cashfree API
+    const returnUrl = new URL(req.url).origin + "/subscription?order_id=" + orderId
     
-    // Ensure we're using https for production
-    if (returnUrl.protocol === "http:") {
-      returnUrl.protocol = "https:";
-    }
-    
-    // Add subscription path and parameters
-    const returnPath = `${returnUrl.toString()}subscription?order_id=${orderId}&order_status=PAID`;
-    const cancelPath = `${returnUrl.toString()}subscription?order_status=CANCELLED`;
-
-    console.log(`Return URL: ${returnPath}`);
-    console.log(`Cancel URL: ${cancelPath}`);
-
-    // Create order with Cashfree
-    const orderPayload = {
+    const data = {
       order_id: orderId,
       order_amount: orderAmount,
       order_currency: "INR",
       customer_details: {
-        customer_id: user.id,
-        customer_email: customerEmail || user.email,
-        customer_phone: "9999999999", // Replace with actual phone if available
-        customer_name: customerName || user.email.split('@')[0],
+        customer_id: profileId,
+        customer_email: customerEmail,
+        customer_name: customerName || customerEmail.split('@')[0],
+        customer_phone: customerPhone || "9999999999"
       },
       order_meta: {
-        return_url: returnPath,
-        notify_url: returnPath, // Webhook URL if you have one
-      },
-      order_note: `Subscription for ${priceId} plan`,
-    };
-
-    console.log("Creating Cashfree order with payload:", JSON.stringify(orderPayload));
-
-    // Call Cashfree API to create order
-    const response = await fetch(`${CASHFREE_API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        'x-api-version': '2022-09-01',
-        'Content-Type': 'application/json',
-        'x-client-id': CASHFREE_APP_ID,
-        'x-client-secret': CASHFREE_SECRET_KEY,
-      },
-      body: JSON.stringify(orderPayload),
-    });
-
-    const data = await response.json();
-    console.log("Cashfree response:", JSON.stringify(data));
-
-    if (!response.ok) {
-      return new Response(JSON.stringify({ 
-        error: "Failed to create payment order", 
-        details: data 
-      }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        return_url: returnUrl + "&order_status={order_status}"
+      }
     }
 
-    // Return the payment link
-    const payment_link = data.payment_link || "";
-    return new Response(JSON.stringify({ payment_link }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.log("Creating Cashfree order with data:", JSON.stringify(data))
 
+    // Make API request to Cashfree
+    const response = await fetch("https://sandbox.cashfree.com/pg/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-version": "2022-09-01",
+        "x-client-id": appId,
+        "x-client-secret": secretKey
+      },
+      body: JSON.stringify(data)
+    })
+
+    const responseData = await response.json()
+    console.log("Cashfree API response:", JSON.stringify(responseData))
+
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Cashfree API error", 
+          details: responseData,
+          statusCode: response.status,
+          statusText: response.statusText
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        payment_link: responseData.payment_link,
+        order_id: responseData.order_id,
+        order_status: responseData.order_status
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    )
   } catch (error) {
-    console.error("Server error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error("Unexpected error:", error)
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    )
   }
-});
+})

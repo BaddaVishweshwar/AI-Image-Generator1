@@ -122,7 +122,7 @@ export const useSubscription = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      // Fix: Use proper query structure - don't use profile_id as a URL parameter
+      // Use a proper request structure - don't include profile_id in the URL
       const { data, error } = await supabase
         .from("generation_counts")
         .select("count")
@@ -189,21 +189,22 @@ export const useSubscription = () => {
         
         console.log('Creating Cashfree order...');
         
-        // Add the customer's email to the request for better identification in Cashfree
+        // Add more detailed customer information and error handling
         const { data: response, error } = await supabase.functions.invoke("create-cashfree-order", {
           body: { 
             priceId: plan.tier,
             orderId: orderId,
             orderAmount: plan.amount,
-            customerEmail: session.user.email,
-            customerName: session.user.email.split('@')[0], // Use part of email as name
+            customerEmail: session.user.email || 'unknown@example.com',
+            customerName: session.user.email ? session.user.email.split('@')[0] : 'User',
+            customerPhone: '9999999999', // Add a default phone as Cashfree might require it
             profileId: profiles.id
           }
         });
 
         if (error) {
           console.error('Cashfree order creation error:', error);
-          throw error;
+          throw new Error(`Payment service error: ${error.message}`);
         }
 
         if (!response?.payment_link) {

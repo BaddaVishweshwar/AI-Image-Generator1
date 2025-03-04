@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
+import { Progress } from "@/components/ui/progress";
 
 const EXAMPLE_PROMPTS = [
   "A serene mountain landscape with snow-capped peaks at sunset",
@@ -144,7 +145,7 @@ const ImageGenerator = () => {
           console.error("Error incrementing count:", incrementError);
         }
         
-        // Update remaining generations count
+        // Update remaining generations count immediately
         if (currentPlan.profile_id) {
           await fetchRemainingGenerations(currentPlan.profile_id);
           await fetchCurrentPlan();
@@ -193,9 +194,20 @@ const ImageGenerator = () => {
           Turn Your Imagination Into Stunning AI-Generated Art
         </p>
         {currentPlan?.tier === 'free' && (
-          <p className="text-sm font-medium text-amber-600">
-            {remainingGenerations !== null ? `${remainingGenerations} images remaining today` : 'Loading...'}
-          </p>
+          <div className="bg-white p-3 border rounded-md shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <p className="text-sm font-medium text-amber-600">
+                Daily Free Generations
+              </p>
+            </div>
+            <Progress value={(remainingGenerations ?? 0) * 20} className="h-2 mb-1" />
+            <p className="text-xs text-gray-600 text-right">
+              {remainingGenerations !== null 
+                ? `${remainingGenerations} ${remainingGenerations === 1 ? 'image' : 'images'} remaining today` 
+                : 'Loading...'}
+            </p>
+          </div>
         )}
       </div>
 

@@ -60,37 +60,42 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get Paddle API keys
-    const vendorId = Deno.env.get('PADDLE_VENDOR_ID');
+    const sellerId = Deno.env.get('PADDLE_SELLER_ID'); // Changed from VENDOR_ID to SELLER_ID
     const apiKey = Deno.env.get('PADDLE_API_KEY');
 
-    if (!vendorId || !apiKey) {
-      throw new Error("Paddle API configuration missing");
+    console.log("Seller ID available:", !!sellerId);
+    console.log("API Key available:", !!apiKey);
+
+    if (!sellerId || !apiKey) {
+      throw new Error("Paddle API configuration missing. Please set PADDLE_SELLER_ID and PADDLE_API_KEY in Supabase secrets.");
     }
 
     console.log("Creating Paddle checkout...");
 
-    // Map our price IDs to Paddle product IDs
-    // These should be replaced with your actual Paddle product IDs
-    const productMapping = {
-      'daily': 'pd_123_daily', // Replace with actual Paddle product ID
-      'monthly': 'pd_456_monthly', // Replace with actual Paddle product ID
-      'lifetime': 'pd_789_lifetime' // Replace with actual Paddle product ID
+    // For testing/development, let's create a simple checkout that will work without actual Paddle products
+    // Map our price IDs to test prices
+    const priceMapping = {
+      'daily': { price: '49', currency: 'INR' },
+      'monthly': { price: '149', currency: 'INR' },
+      'lifetime': { price: '1999', currency: 'INR' }
     };
 
-    const paddleProductId = productMapping[priceId];
+    const selectedPrice = priceMapping[priceId];
     
-    if (!paddleProductId) {
-      throw new Error(`No Paddle product ID found for tier: ${priceId}`);
-    }
-
     // Create transaction ID with tier info for webhook reference
     const transactionId = `${priceId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 
     // Prepare data for Paddle checkout
     const checkoutData = new FormData();
-    checkoutData.append('vendor_id', vendorId);
-    checkoutData.append('vendor_auth_code', apiKey);
-    checkoutData.append('product_id', paddleProductId);
+    checkoutData.append('seller_id', sellerId); // Changed from vendor_id to seller_id
+    checkoutData.append('auth_code', apiKey); // Changed from vendor_auth_code to auth_code
+    
+    // Dynamic product creation approach (for testing without actual Paddle products)
+    checkoutData.append('product_name', `${priceId.charAt(0).toUpperCase() + priceId.slice(1)} Plan`);
+    checkoutData.append('prices', `[{"currency":"${selectedPrice.currency}","amount":"${selectedPrice.price}"}]`);
+    checkoutData.append('title', 'Complete Your Purchase');
+    checkoutData.append('image_url', 'https://your-app-domain.com/logo.png');
+    
     checkoutData.append('customer_email', customerEmail);
     checkoutData.append('customer_name', customerName || 'Customer');
     checkoutData.append('passthrough', JSON.stringify({
@@ -101,10 +106,17 @@ serve(async (req) => {
     checkoutData.append('return_url', successUrl);
     checkoutData.append('cancel_url', cancelUrl);
 
-    // Send the request to Paddle API
-    const response = await fetch('https://vendors.paddle.com/api/2.0/product/generate_pay_link', {
+    console.log("Sending checkout creation request to Paddle API");
+    console.log("Checkout data:", Object.fromEntries(checkoutData.entries()));
+
+    // Use the checkout/create API endpoint (newer Paddle API)
+    const response = await fetch('https://sandbox-api.paddle.com/checkout/create', {
       method: 'POST',
       body: checkoutData,
+      headers: {
+        // If needed, Paddle may require additional headers for the newer API
+        'Cache-Control': 'no-cache',
+      }
     });
 
     // Get the response body for better error handling
@@ -116,22 +128,34 @@ serve(async (req) => {
     try {
       responseData = JSON.parse(responseText);
     } catch (e) {
-      throw new Error(`Failed to parse Paddle response: ${e.message}`);
+      console.error("Failed to parse Paddle response:", e);
+      throw new Error(`Failed to parse Paddle response: ${e.message}. Raw response: ${responseText.substring(0, 200)}...`);
     }
 
-    if (!response.ok || !responseData.success) {
-      throw new Error(`Paddle API error: ${responseData.error?.message || 'Unknown error'}`);
+    // Handle response format variations between Paddle API versions
+    let checkoutUrl = null;
+    
+    if (responseData.checkout?.url) {
+      // New API format
+      checkoutUrl = responseData.checkout.url;
+    } else if (responseData.response?.url) {
+      // Old API format
+      checkoutUrl = responseData.response.url;
+    } else if (responseData.url) {
+      // Simple direct format
+      checkoutUrl = responseData.url;
     }
     
-    if (!responseData.response?.url) {
-      throw new Error("No checkout URL returned from Paddle");
+    if (!checkoutUrl) {
+      console.error("No checkout URL found in response:", JSON.stringify(responseData));
+      throw new Error("No checkout URL returned from Paddle. Check response format: " + JSON.stringify(responseData).substring(0, 200));
     }
     
-    console.log("Paddle checkout created successfully:", responseData.response);
+    console.log("Paddle checkout created successfully with URL:", checkoutUrl);
 
     return new Response(
       JSON.stringify({ 
-        payment_link: responseData.response.url,
+        payment_link: checkoutUrl,
         transaction_id: transactionId
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

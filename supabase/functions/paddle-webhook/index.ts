@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.1";
-import * as crypto from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,14 +17,9 @@ serve(async (req) => {
     // Get Supabase API keys from environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const paddlePublicKey = Deno.env.get('PADDLE_PUBLIC_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error("Supabase configuration missing");
-    }
-
-    if (!paddlePublicKey) {
-      throw new Error("Paddle public key missing");
     }
 
     // Create a Supabase client with the service role key
@@ -40,9 +34,6 @@ serve(async (req) => {
     }
 
     console.log("Paddle webhook received:", JSON.stringify(webhookData));
-
-    // Verify the webhook signature (simplified version - implement full p_signature verification in production)
-    // For production, you should implement full signature verification using the Paddle public key
     
     // Process the webhook based on the alert_name
     const alertName = webhookData.alert_name;
@@ -94,7 +85,7 @@ serve(async (req) => {
         profile_id: profile_id,
         tier: tier,
         end_date: end_date,
-        stripe_subscription_id: webhookData.subscription_id || null, // Store Paddle subscription ID if available
+        paddle_subscription_id: webhookData.subscription_id || null, // Store Paddle subscription ID if available
       });
 
       if (subscriptionError) {

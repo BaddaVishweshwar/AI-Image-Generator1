@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,7 +46,6 @@ export const useSubscription = () => {
         return;
       }
 
-      // First check if there's an active subscription with an end_date in the future or null
       const now = new Date().toISOString();
       const { data: activeSubscription, error: activeSubError } = await supabase
         .from("subscriptions")
@@ -69,7 +67,6 @@ export const useSubscription = () => {
           profile_id: profiles.id
         });
         
-        // Fetch remaining generations for free tier
         if (activeSubscription.tier === 'free') {
           await fetchRemainingGenerations(profiles.id);
         } else {
@@ -78,7 +75,6 @@ export const useSubscription = () => {
         return;
       }
 
-      // If no active subscription, get the most recent one of any kind
       const { data: subscription, error: subscriptionError } = await supabase
         .from("subscriptions")
         .select("*")
@@ -98,14 +94,12 @@ export const useSubscription = () => {
           profile_id: profiles.id
         });
         
-        // Fetch remaining generations for free tier
         if (subscription.tier === 'free') {
           await fetchRemainingGenerations(profiles.id);
         } else {
           setRemainingGenerations(null);
         }
       } else {
-        // No subscription at all, set to free tier
         setCurrentPlan({
           tier: 'free',
           user_id: session.user.id,
@@ -113,7 +107,6 @@ export const useSubscription = () => {
           end_date: null
         });
         
-        // Fetch remaining generations for free tier
         await fetchRemainingGenerations(profiles.id);
       }
     } catch (error) {
@@ -124,10 +117,8 @@ export const useSubscription = () => {
 
   const fetchRemainingGenerations = async (profileId: string) => {
     try {
-      // Get today's date in YYYY-MM-DD format for the database query
       const today = new Date().toISOString().split('T')[0];
       
-      // Use a more reliable query approach
       const { data, error } = await supabase
         .from("generation_counts")
         .select("count")
@@ -137,7 +128,7 @@ export const useSubscription = () => {
 
       if (error) {
         console.error('Error fetching generation counts:', error);
-        setRemainingGenerations(5); // Default to 5 if there's an error
+        setRemainingGenerations(5);
         return;
       }
 
@@ -145,7 +136,7 @@ export const useSubscription = () => {
       setRemainingGenerations(5 - usedCount);
     } catch (error) {
       console.error('Error in fetchRemainingGenerations:', error);
-      setRemainingGenerations(5); // Default to 5 if there's an error
+      setRemainingGenerations(5);
     }
   };
 
@@ -170,7 +161,7 @@ export const useSubscription = () => {
     try {
       const { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select("id, display_name") // Also get display name if available
+        .select("id, display_name")
         .eq("user_id", session.user.id)
         .maybeSingle();
 
@@ -195,12 +186,10 @@ export const useSubscription = () => {
         toast.success("Successfully subscribed to free plan!");
         await fetchCurrentPlan();
       } else {
-        // Get user details for Paddle
         let customerName = profiles.display_name || 
-                         (session.user.email ? session.user.email.split('@')[0] : 'User');
+                          (session.user.email ? session.user.email.split('@')[0] : 'User');
         const customerEmail = session.user.email || 'unknown@example.com';
         
-        // Create success and cancel URLs
         const origin = window.location.origin;
         const successUrl = `${origin}/subscription?success=true`;
         const cancelUrl = `${origin}/subscription?canceled=true`;

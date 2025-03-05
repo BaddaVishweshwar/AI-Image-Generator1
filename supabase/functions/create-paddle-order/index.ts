@@ -60,7 +60,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get Paddle API keys
-    const sellerId = Deno.env.get('PADDLE_SELLER_ID'); // Changed from VENDOR_ID to SELLER_ID
+    const sellerId = Deno.env.get('PADDLE_SELLER_ID');
     const apiKey = Deno.env.get('PADDLE_API_KEY');
 
     console.log("Seller ID available:", !!sellerId);
@@ -72,8 +72,7 @@ serve(async (req) => {
 
     console.log("Creating Paddle checkout...");
 
-    // For testing/development, let's create a simple checkout that will work without actual Paddle products
-    // Map our price IDs to test prices
+    // Map our price IDs to their actual prices
     const priceMapping = {
       'daily': { price: '49', currency: 'INR' },
       'monthly': { price: '149', currency: 'INR' },
@@ -85,41 +84,40 @@ serve(async (req) => {
     // Create transaction ID with tier info for webhook reference
     const transactionId = `${priceId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 
-    // Prepare data for Paddle checkout
-    const checkoutData = new FormData();
-    checkoutData.append('seller_id', sellerId); // Changed from vendor_id to seller_id
-    checkoutData.append('auth_code', apiKey); // Changed from vendor_auth_code to auth_code
-    
-    // Dynamic product creation approach (for testing without actual Paddle products)
-    checkoutData.append('product_name', `${priceId.charAt(0).toUpperCase() + priceId.slice(1)} Plan`);
-    checkoutData.append('prices', `[{"currency":"${selectedPrice.currency}","amount":"${selectedPrice.price}"}]`);
-    checkoutData.append('title', 'Complete Your Purchase');
-    checkoutData.append('image_url', 'https://your-app-domain.com/logo.png');
-    
-    checkoutData.append('customer_email', customerEmail);
-    checkoutData.append('customer_name', customerName || 'Customer');
-    checkoutData.append('passthrough', JSON.stringify({
+    // Build URL with parameters for Paddle Checkout
+    const params = new URLSearchParams();
+    params.append('seller_id', sellerId);
+    params.append('product_name', `${priceId.charAt(0).toUpperCase() + priceId.slice(1)} Plan`);
+    params.append('customer_email', customerEmail);
+    params.append('customer_name', customerName || 'Customer');
+    params.append('customer_country', 'IN'); // Default to India
+    params.append('price', selectedPrice.price);
+    params.append('currency', selectedPrice.currency);
+    params.append('passthrough', JSON.stringify({
       profile_id: profileId,
-      tier: priceId,
-      transaction_id: transactionId
+      tier: priceId
     }));
-    checkoutData.append('return_url', successUrl);
-    checkoutData.append('cancel_url', cancelUrl);
+    params.append('return_url', successUrl);
+    params.append('cancel_url', cancelUrl);
+    params.append('title', 'Complete Your Purchase');
+    
+    // Using Paddle's Generate Payment Link API
+    const checkoutUrl = `https://sandbox-vendors.paddle.com/api/2.0/product/generate_pay_link?${params.toString()}`;
+    
+    // Add the authentication to the request directly
+    params.append('vendor_id', sellerId);
+    params.append('vendor_auth_code', apiKey);
 
-    console.log("Sending checkout creation request to Paddle API");
-    console.log("Checkout data:", Object.fromEntries(checkoutData.entries()));
-
-    // Use the checkout/create API endpoint (newer Paddle API)
-    const response = await fetch('https://sandbox-api.paddle.com/checkout/create', {
+    console.log("Sending checkout request to:", checkoutUrl);
+    
+    const response = await fetch(checkoutUrl, {
       method: 'POST',
-      body: checkoutData,
       headers: {
-        // If needed, Paddle may require additional headers for the newer API
-        'Cache-Control': 'no-cache',
-      }
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params
     });
 
-    // Get the response body for better error handling
     const responseText = await response.text();
     console.log("Paddle API response status:", response.status);
     console.log("Paddle API response body:", responseText);
@@ -132,30 +130,22 @@ serve(async (req) => {
       throw new Error(`Failed to parse Paddle response: ${e.message}. Raw response: ${responseText.substring(0, 200)}...`);
     }
 
-    // Handle response format variations between Paddle API versions
-    let checkoutUrl = null;
+    if (!responseData.success) {
+      throw new Error(`Paddle API error: ${responseData.error?.message || "Unknown error"}`);
+    }
+
+    const paymentLink = responseData.response.url;
     
-    if (responseData.checkout?.url) {
-      // New API format
-      checkoutUrl = responseData.checkout.url;
-    } else if (responseData.response?.url) {
-      // Old API format
-      checkoutUrl = responseData.response.url;
-    } else if (responseData.url) {
-      // Simple direct format
-      checkoutUrl = responseData.url;
+    if (!paymentLink) {
+      console.error("No payment URL found in response:", JSON.stringify(responseData));
+      throw new Error("No payment URL returned from Paddle.");
     }
     
-    if (!checkoutUrl) {
-      console.error("No checkout URL found in response:", JSON.stringify(responseData));
-      throw new Error("No checkout URL returned from Paddle. Check response format: " + JSON.stringify(responseData).substring(0, 200));
-    }
-    
-    console.log("Paddle checkout created successfully with URL:", checkoutUrl);
+    console.log("Paddle checkout created successfully with URL:", paymentLink);
 
     return new Response(
       JSON.stringify({ 
-        payment_link: checkoutUrl,
+        payment_link: paymentLink,
         transaction_id: transactionId
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

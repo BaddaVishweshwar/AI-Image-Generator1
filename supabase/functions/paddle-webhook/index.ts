@@ -26,11 +26,15 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse the webhook data
-    const formData = await req.formData();
-    const webhookData: Record<string, string> = {};
-    
-    for (const [key, value] of formData.entries()) {
-      webhookData[key] = value.toString();
+    let webhookData;
+    if (req.headers.get("content-type")?.includes("application/json")) {
+      webhookData = await req.json();
+    } else {
+      const formData = await req.formData();
+      webhookData = {};
+      for (const [key, value] of formData.entries()) {
+        webhookData[key] = value.toString();
+      }
     }
 
     console.log("Paddle webhook received:", JSON.stringify(webhookData));

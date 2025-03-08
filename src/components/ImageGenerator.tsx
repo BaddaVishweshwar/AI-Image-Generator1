@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +44,6 @@ const ImageGenerator = () => {
     const fetchProfile = async () => {
       if (!session?.user?.id) return;
 
-      // Get user profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id')
@@ -60,7 +58,6 @@ const ImageGenerator = () => {
     fetchProfile();
   }, [session]);
 
-  // Calculate time left for paid plans
   useEffect(() => {
     if (!currentPlan || !currentPlan.end_date || currentPlan.tier === 'free' || currentPlan.tier === 'lifetime') {
       setTimeLeft(null);
@@ -72,44 +69,35 @@ const ImageGenerator = () => {
       const endDate = new Date(currentPlan.end_date);
       
       if (endDate <= now) {
-        // Plan has expired, refresh the plan data
         fetchCurrentPlan();
         setTimeLeft("Expired");
         return;
       }
 
-      // Calculate the remaining time
       const duration = intervalToDuration({ start: now, end: endDate });
       
       if (currentPlan.tier === 'daily') {
-        // For daily plan, show hours and minutes
         const hours = duration.hours || 0;
         const minutes = duration.minutes || 0;
         setTimeLeft(`${hours}h ${minutes}m`);
       } else if (currentPlan.tier === 'monthly') {
-        // For monthly plan, show days and hours
         const days = duration.days || 0;
         const hours = duration.hours || 0;
         setTimeLeft(`${days}d ${hours}h`);
       }
     };
 
-    // Initial calculation
     calculateTimeLeft();
     
-    // Update every minute
     const interval = setInterval(calculateTimeLeft, 60000);
     
     return () => clearInterval(interval);
   }, [currentPlan, fetchCurrentPlan]);
 
-  // Refresh the current plan and remaining generations periodically
   useEffect(() => {
     if (currentPlan?.profile_id && currentPlan.tier === 'free') {
-      // Initial fetch
       fetchRemainingGenerations(currentPlan.profile_id);
       
-      // Refresh every 30 seconds
       const interval = setInterval(() => {
         fetchRemainingGenerations(currentPlan.profile_id);
       }, 30000);
@@ -141,7 +129,6 @@ const ImageGenerator = () => {
       return;
     }
 
-    // Check if user has remaining generations for free tier
     if (currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0) {
       toast.error("You've reached your daily limit. Please upgrade your plan to generate more images.");
       navigate("/subscription");
@@ -169,7 +156,6 @@ const ImageGenerator = () => {
         throw new Error("Profile not found. Please try logging out and back in.");
       }
 
-      // Store the image in Supabase
       const { error: insertError } = await supabase.from("images").insert({
         prompt,
         image_url: data.imageUrl,
@@ -181,10 +167,8 @@ const ImageGenerator = () => {
         throw new Error('Failed to save image');
       }
 
-      // If user is on free tier, increment generation count
       if (currentPlan?.tier === 'free') {
         try {
-          // Use the proper RPC call with parameter
           const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
             profile_id: profile.id 
           });
@@ -194,14 +178,11 @@ const ImageGenerator = () => {
             throw new Error(`Failed to update generation count: ${incrementError.message}`);
           }
           
-          // Update remaining generations count immediately for better UX
           if (remainingGenerations !== null && remainingGenerations > 0) {
-            // Explicitly update the UI immediately (optimistic update)
             await fetchRemainingGenerations(profile.id);
           }
         } catch (error: any) {
           console.error("Error updating generation count:", error);
-          // We'll continue even if the count update fails
         }
       }
 
@@ -225,7 +206,6 @@ const ImageGenerator = () => {
     setPrompt(examplePrompt);
   };
 
-  // Determine if generation should be disabled
   const isGenerationDisabled = () => {
     if (isLoading) return true;
     
@@ -234,7 +214,7 @@ const ImageGenerator = () => {
     }
     
     if (currentPlan?.end_date && new Date(currentPlan.end_date) < new Date()) {
-      return true; // Plan has expired
+      return true;
     }
     
     return false;
@@ -262,7 +242,6 @@ const ImageGenerator = () => {
           Turn Your Imagination Into Stunning AI-Generated Art
         </p>
         
-        {/* Subscription Status */}
         <Card className="border-purple-100 shadow-sm">
           <CardContent className="p-4">
             <div className="flex justify-between items-center mb-2">
@@ -316,7 +295,7 @@ const ImageGenerator = () => {
         </Card>
         
         {currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0 && (
-          <Alert variant="warning" className="border-amber-200 bg-amber-50">
+          <Alert className="border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-amber-800">
               You've used all 5 free images for today. Upgrade or wait until tomorrow!

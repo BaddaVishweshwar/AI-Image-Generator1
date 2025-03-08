@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Clock } from "lucide-react";
+import { Download, Clock, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatDistanceToNow, intervalToDuration } from "date-fns";
 
 const EXAMPLE_PROMPTS = [
   "A serene mountain landscape with snow-capped peaks at sunset",
@@ -23,6 +25,7 @@ const ImageGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const navigate = useNavigate();
   const { currentPlan, remainingGenerations, fetchCurrentPlan, fetchRemainingGenerations } = useSubscription();
 
@@ -56,6 +59,49 @@ const ImageGenerator = () => {
 
     fetchProfile();
   }, [session]);
+
+  // Calculate time left for paid plans
+  useEffect(() => {
+    if (!currentPlan || !currentPlan.end_date || currentPlan.tier === 'free' || currentPlan.tier === 'lifetime') {
+      setTimeLeft(null);
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const endDate = new Date(currentPlan.end_date);
+      
+      if (endDate <= now) {
+        // Plan has expired, refresh the plan data
+        fetchCurrentPlan();
+        setTimeLeft("Expired");
+        return;
+      }
+
+      // Calculate the remaining time
+      const duration = intervalToDuration({ start: now, end: endDate });
+      
+      if (currentPlan.tier === 'daily') {
+        // For daily plan, show hours and minutes
+        const hours = duration.hours || 0;
+        const minutes = duration.minutes || 0;
+        setTimeLeft(`${hours}h ${minutes}m`);
+      } else if (currentPlan.tier === 'monthly') {
+        // For monthly plan, show days and hours
+        const days = duration.days || 0;
+        const hours = duration.hours || 0;
+        setTimeLeft(`${days}d ${hours}h`);
+      }
+    };
+
+    // Initial calculation
+    calculateTimeLeft();
+    
+    // Update every minute
+    const interval = setInterval(calculateTimeLeft, 60000);
+    
+    return () => clearInterval(interval);
+  }, [currentPlan, fetchCurrentPlan]);
 
   // Refresh the current plan and remaining generations periodically
   useEffect(() => {
@@ -138,7 +184,7 @@ const ImageGenerator = () => {
       // If user is on free tier, increment generation count
       if (currentPlan?.tier === 'free') {
         try {
-          // Fix: Use the proper RPC call with explicit parameter naming
+          // Use the proper RPC call with parameter
           const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
             profile_id: profile.id 
           });
@@ -150,16 +196,12 @@ const ImageGenerator = () => {
           
           // Update remaining generations count immediately for better UX
           if (remainingGenerations !== null && remainingGenerations > 0) {
-            const newRemainingGenerations = remainingGenerations - 1;
             // Explicitly update the UI immediately (optimistic update)
-            // The actual refresh will happen in the background
             await fetchRemainingGenerations(profile.id);
-            await fetchCurrentPlan();
           }
         } catch (error: any) {
           console.error("Error updating generation count:", error);
           // We'll continue even if the count update fails
-          // The generation was successful, we just couldn't update the count
         }
       }
 
@@ -183,6 +225,21 @@ const ImageGenerator = () => {
     setPrompt(examplePrompt);
   };
 
+  // Determine if generation should be disabled
+  const isGenerationDisabled = () => {
+    if (isLoading) return true;
+    
+    if (currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0) {
+      return true;
+    }
+    
+    if (currentPlan?.end_date && new Date(currentPlan.end_date) < new Date()) {
+      return true; // Plan has expired
+    }
+    
+    return false;
+  };
+
   if (!session) {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -204,21 +261,74 @@ const ImageGenerator = () => {
         <p className="text-muted-foreground">
           Turn Your Imagination Into Stunning AI-Generated Art
         </p>
-        {currentPlan?.tier === 'free' && (
-          <div className="bg-white p-3 border rounded-md shadow-sm">
-            <div className="flex items-center space-x-2 mb-1">
-              <Clock className="h-4 w-4 text-amber-500" />
-              <p className="text-sm font-medium text-amber-600">
-                Daily Free Generations
-              </p>
+        
+        {/* Subscription Status */}
+        <Card className="border-purple-100 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-semibold text-purple-700">
+                {currentPlan?.tier === 'free' ? 'Free Plan' : 
+                 currentPlan?.tier === 'daily' ? '1 Day of Unlimited Magic' : 
+                 currentPlan?.tier === 'monthly' ? '30 Days of Endless Imagination' : 
+                 'Lifetime of Limitless Art'}
+              </h3>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate("/subscription")}
+                className="text-xs h-8"
+              >
+                {currentPlan?.tier === 'free' ? 'Upgrade' : 'Manage'}
+              </Button>
             </div>
-            <Progress value={(remainingGenerations ?? 0) * 20} className="h-2 mb-1" />
-            <p className="text-xs text-gray-600 text-right">
-              {remainingGenerations !== null 
-                ? `${remainingGenerations} ${remainingGenerations === 1 ? 'image' : 'images'} remaining today` 
-                : 'Loading...'}
-            </p>
-          </div>
+            
+            {currentPlan?.tier === 'free' && (
+              <div>
+                <Progress value={(remainingGenerations ?? 0) * 20} className="h-2 mb-1" />
+                <p className="text-xs text-gray-600 text-right">
+                  {remainingGenerations !== null 
+                    ? `${remainingGenerations} ${remainingGenerations === 1 ? 'image' : 'images'} remaining today` 
+                    : 'Loading...'}
+                </p>
+              </div>
+            )}
+            
+            {currentPlan?.tier !== 'free' && currentPlan?.tier !== 'lifetime' && timeLeft && (
+              <div className="text-sm text-gray-600">
+                <p className="flex items-center">
+                  <Clock className="h-4 w-4 mr-1 text-purple-500" />
+                  {timeLeft === "Expired" 
+                    ? "Your plan has expired" 
+                    : `Expires in ${timeLeft}`}
+                </p>
+              </div>
+            )}
+            
+            {currentPlan?.tier === 'lifetime' && (
+              <p className="text-sm text-gray-600 flex items-center">
+                <svg className="h-4 w-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Lifetime access activated!
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        
+        {currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0 && (
+          <Alert variant="warning" className="border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-amber-800">
+              You've used all 5 free images for today. Upgrade or wait until tomorrow!
+              <Button 
+                variant="link" 
+                className="text-purple-600 p-0 h-auto text-sm ml-1"
+                onClick={() => navigate("/subscription")}
+              >
+                Upgrade now
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -232,24 +342,11 @@ const ImageGenerator = () => {
           />
           <Button 
             onClick={handleGenerate} 
-            disabled={isLoading || (currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0)}
+            disabled={isGenerationDisabled()}
           >
             {isLoading ? "Generating..." : "Generate"}
           </Button>
         </div>
-
-        {currentPlan?.tier === 'free' && remainingGenerations !== null && remainingGenerations <= 0 && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-            You've reached your daily limit of 5 images. 
-            <Button 
-              variant="link" 
-              className="text-purple-600 p-0 h-auto text-sm"
-              onClick={() => navigate("/subscription")}
-            >
-              Upgrade your plan
-            </Button> to generate more images.
-          </div>
-        )}
 
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Example prompts:</p>

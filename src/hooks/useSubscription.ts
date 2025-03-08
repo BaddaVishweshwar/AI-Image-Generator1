@@ -89,16 +89,43 @@ export const useSubscription = () => {
       }
 
       if (subscription) {
-        setCurrentPlan({
-          ...subscription,
-          user_id: session.user.id,
-          profile_id: profiles.id
-        });
+        // If the subscription has an end_date and it's in the past, it's expired
+        const isExpired = subscription.end_date && new Date(subscription.end_date) < new Date();
         
-        if (subscription.tier === 'free') {
+        if (isExpired && subscription.tier !== 'free') {
+          // If expired and not free, add a new free tier subscription
+          const { error: newSubError } = await supabase
+            .from("subscriptions")
+            .insert({
+              profile_id: profiles.id,
+              tier: 'free',
+              end_date: null
+            });
+            
+          if (newSubError) {
+            console.error('Error creating free subscription after expiry:', newSubError);
+          }
+          
+          setCurrentPlan({
+            tier: 'free',
+            user_id: session.user.id,
+            profile_id: profiles.id,
+            end_date: null
+          });
+          
           await fetchRemainingGenerations(profiles.id);
         } else {
-          setRemainingGenerations(null);
+          setCurrentPlan({
+            ...subscription,
+            user_id: session.user.id,
+            profile_id: profiles.id
+          });
+          
+          if (subscription.tier === 'free') {
+            await fetchRemainingGenerations(profiles.id);
+          } else {
+            setRemainingGenerations(null);
+          }
         }
       } else {
         setCurrentPlan({
@@ -195,11 +222,10 @@ export const useSubscription = () => {
         const successUrl = `${origin}/subscription?success=true`;
         const cancelUrl = `${origin}/subscription?canceled=true`;
         
-        console.log('Creating Instamojo checkout...');
+        console.log('Creating Paddle checkout...');
         
         try {
-          // Update to use the Instamojo edge function
-          const { data: response, error } = await supabase.functions.invoke("create-instamojo-order", {
+          const { data: response, error } = await supabase.functions.invoke("create-paddle-order", {
             body: { 
               priceId: plan.tier,
               customerEmail: customerEmail,
@@ -211,7 +237,7 @@ export const useSubscription = () => {
           });
 
           if (error) {
-            console.error('Instamojo checkout creation error:', error);
+            console.error('Paddle checkout creation error:', error);
             throw new Error(`Payment service error: ${error.message}`);
           }
 
@@ -219,7 +245,7 @@ export const useSubscription = () => {
             throw new Error("Failed to create payment link: " + JSON.stringify(response));
           }
 
-          console.log('Redirecting to Instamojo checkout:', response.payment_link);
+          console.log('Redirecting to Paddle checkout:', response.payment_link);
           window.location.href = response.payment_link;
         } catch (error) {
           console.error("Failed to create payment order:", error);

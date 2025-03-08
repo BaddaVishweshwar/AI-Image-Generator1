@@ -72,42 +72,38 @@ serve(async (req) => {
 
     console.log("Creating Paddle checkout...");
 
-    // Map our price IDs to their actual prices
+    // Map our price IDs to products and prices
     const priceMapping = {
-      'daily': { price: '49', currency: 'INR' },
-      'monthly': { price: '149', currency: 'INR' },
-      'lifetime': { price: '1999', currency: 'INR' }
+      'daily': { name: '1 Day of Unlimited Magic', price: '49', currency: 'INR' },
+      'monthly': { name: '30 Days of Endless Imagination', price: '149', currency: 'INR' },
+      'lifetime': { name: 'A Lifetime of Limitless Art', price: '1999', currency: 'INR' }
     };
 
-    const selectedPrice = priceMapping[priceId];
+    const selectedProduct = priceMapping[priceId];
     
     // Create transaction ID with tier info for webhook reference
     const transactionId = `${priceId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 
     // Build URL with parameters for Paddle Checkout
     const params = new URLSearchParams();
-    params.append('seller_id', sellerId);
-    params.append('product_name', `${priceId.charAt(0).toUpperCase() + priceId.slice(1)} Plan`);
+    params.append('vendor_id', sellerId);
+    params.append('vendor_auth_code', apiKey);
+    params.append('product_name', selectedProduct.name);
+    params.append('title', 'Complete your purchase');
     params.append('customer_email', customerEmail);
     params.append('customer_name', customerName || 'Customer');
-    params.append('customer_country', 'IN'); // Default to India
-    params.append('price', selectedPrice.price);
-    params.append('currency', selectedPrice.currency);
+    params.append('prices', selectedProduct.currency + ':' + selectedProduct.price);
     params.append('passthrough', JSON.stringify({
       profile_id: profileId,
       tier: priceId
     }));
     params.append('return_url', successUrl);
     params.append('cancel_url', cancelUrl);
-    params.append('title', 'Complete Your Purchase');
+    params.append('disable_logout', 'true');
     
     // Using Paddle's Generate Payment Link API
-    const checkoutUrl = `https://sandbox-vendors.paddle.com/api/2.0/product/generate_pay_link?${params.toString()}`;
+    const checkoutUrl = `https://vendors.paddle.com/api/2.0/product/generate_pay_link`;
     
-    // Add the authentication to the request directly
-    params.append('vendor_id', sellerId);
-    params.append('vendor_auth_code', apiKey);
-
     console.log("Sending checkout request to:", checkoutUrl);
     
     const response = await fetch(checkoutUrl, {

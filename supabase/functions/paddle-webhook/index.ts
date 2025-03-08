@@ -72,13 +72,14 @@ serve(async (req) => {
     if (alertName === 'payment_succeeded' || alertName === 'subscription_payment_succeeded') {
       // Calculate end_date based on the tier
       let end_date = null;
+      const now = new Date();
 
       if (tier === 'daily') {
-        const date = new Date();
-        date.setDate(date.getDate() + 1); // Add 1 day
+        const date = new Date(now);
+        date.setHours(date.getHours() + 24); // Add 24 hours
         end_date = date.toISOString();
       } else if (tier === 'monthly') {
-        const date = new Date();
+        const date = new Date(now);
         date.setDate(date.getDate() + 30); // Add 30 days
         end_date = date.toISOString();
       }
@@ -89,6 +90,7 @@ serve(async (req) => {
         profile_id: profile_id,
         tier: tier,
         end_date: end_date,
+        start_date: now.toISOString(),
         paddle_subscription_id: webhookData.subscription_id || null, // Store Paddle subscription ID if available
       });
 
@@ -98,8 +100,21 @@ serve(async (req) => {
 
       console.log(`Successfully processed ${alertName} for profile ${profile_id}, tier ${tier}`);
     } else if (alertName === 'subscription_cancelled') {
-      // Handle subscription cancellation if needed
-      console.log(`Subscription cancelled for profile ${profile_id}`);
+      // Handle subscription cancellation by adding a free tier subscription
+      const { error: subscriptionError } = await supabase.from("subscriptions").insert({
+        profile_id: profile_id,
+        tier: 'free',
+        end_date: null,
+      });
+
+      if (subscriptionError) {
+        throw new Error(`Failed to add free tier subscription: ${subscriptionError.message}`);
+      }
+      
+      console.log(`Subscription cancelled for profile ${profile_id}, reverted to free tier`);
+    } else if (alertName === 'subscription_updated') {
+      // Handle subscription updates if needed
+      console.log(`Subscription updated for profile ${profile_id}`);
     }
 
     return new Response(

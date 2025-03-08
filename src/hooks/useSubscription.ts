@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,10 +195,11 @@ export const useSubscription = () => {
         const successUrl = `${origin}/subscription?success=true`;
         const cancelUrl = `${origin}/subscription?canceled=true`;
         
-        console.log('Creating Paddle checkout...');
+        console.log('Creating Instamojo checkout...');
         
         try {
-          const { data: response, error } = await supabase.functions.invoke("create-paddle-order", {
+          // Update to use the Instamojo edge function
+          const { data: response, error } = await supabase.functions.invoke("create-instamojo-order", {
             body: { 
               priceId: plan.tier,
               customerEmail: customerEmail,
@@ -209,7 +211,7 @@ export const useSubscription = () => {
           });
 
           if (error) {
-            console.error('Paddle checkout creation error:', error);
+            console.error('Instamojo checkout creation error:', error);
             throw new Error(`Payment service error: ${error.message}`);
           }
 
@@ -217,7 +219,7 @@ export const useSubscription = () => {
             throw new Error("Failed to create payment link: " + JSON.stringify(response));
           }
 
-          console.log('Redirecting to Paddle checkout:', response.payment_link);
+          console.log('Redirecting to Instamojo checkout:', response.payment_link);
           window.location.href = response.payment_link;
         } catch (error) {
           console.error("Failed to create payment order:", error);

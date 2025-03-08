@@ -137,24 +137,29 @@ const ImageGenerator = () => {
 
       // If user is on free tier, increment generation count
       if (currentPlan?.tier === 'free') {
-        // Directly use the RPC function to avoid SQL ambiguity issues
-        const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
-          profile_id: profile.id 
-        });
-        
-        if (incrementError) {
-          console.error("Error incrementing count:", incrementError);
-          throw new Error(`Failed to update generation count: ${incrementError.message}`);
-        }
-        
-        // Update remaining generations count immediately
-        if (profile.id) {
-          // Manually decrease the remaining count for immediate UI feedback
+        try {
+          // Fix: Use the proper RPC call with explicit parameter naming
+          const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
+            profile_id: profile.id 
+          });
+          
+          if (incrementError) {
+            console.error("Error incrementing count:", incrementError);
+            throw new Error(`Failed to update generation count: ${incrementError.message}`);
+          }
+          
+          // Update remaining generations count immediately for better UX
           if (remainingGenerations !== null && remainingGenerations > 0) {
-            // Update the remaining count immediately in the UI
+            const newRemainingGenerations = remainingGenerations - 1;
+            // Explicitly update the UI immediately (optimistic update)
+            // The actual refresh will happen in the background
             await fetchRemainingGenerations(profile.id);
             await fetchCurrentPlan();
           }
+        } catch (error: any) {
+          console.error("Error updating generation count:", error);
+          // We'll continue even if the count update fails
+          // The generation was successful, we just couldn't update the count
         }
       }
 

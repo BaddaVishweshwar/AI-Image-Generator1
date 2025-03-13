@@ -225,6 +225,7 @@ export const useSubscription = () => {
         console.log('Creating Paddle checkout...');
         
         try {
+          // Make sure we're calling the correct paddle function
           const { data: response, error } = await supabase.functions.invoke("create-paddle-order", {
             body: { 
               priceId: plan.tier,

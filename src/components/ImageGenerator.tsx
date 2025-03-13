@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,6 +168,7 @@ const ImageGenerator = () => {
         throw new Error('Failed to save image');
       }
 
+      // Update generation count for free tier users
       if (currentPlan?.tier === 'free') {
         try {
           const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
@@ -178,9 +180,8 @@ const ImageGenerator = () => {
             throw new Error(`Failed to update generation count: ${incrementError.message}`);
           }
           
-          if (remainingGenerations !== null && remainingGenerations > 0) {
-            await fetchRemainingGenerations(profile.id);
-          }
+          // Refresh the remaining generations after a successful generation and count update
+          await fetchRemainingGenerations(profile.id);
         } catch (error: any) {
           console.error("Error updating generation count:", error);
         }

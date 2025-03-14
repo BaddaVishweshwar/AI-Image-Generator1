@@ -8,6 +8,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Use the provided API keys
+const HUGGING_FACE_ACCESS_TOKEN = "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";
+const PIXABAY_API_KEY = "49332633-dce2019b5134e9a672d2af561";
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -24,20 +28,7 @@ serve(async (req) => {
     if (!profileId) {
       throw new Error('Profile ID is required');
     }
-
-    const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
     
-    if (!hfToken) {
-      console.error('Hugging Face token not found');
-      throw new Error('API configuration error: Missing Hugging Face token');
-    }
-
-    if (!pixabayApiKey) {
-      console.error('Pixabay API key not found');
-      throw new Error('API configuration error: Missing Pixabay API key');
-    }
-
     console.log('Finding best image for prompt:', prompt, 'Profile ID:', profileId);
 
     let selectedImage = null;
@@ -48,7 +39,7 @@ serve(async (req) => {
     try {
       console.log('Querying Pixabay API for:', prompt);
       const searchTerms = prompt.split(" ").slice(0, 3).join("+"); // Use first 3 words for search
-      const pixabayUrl = `https://pixabay.com/api/?key=${pixabayApiKey}&q=${encodeURIComponent(searchTerms)}&image_type=photo&per_page=3`;
+      const pixabayUrl = `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(searchTerms)}&image_type=photo&per_page=3`;
       
       const pixabayResponse = await fetch(pixabayUrl);
       const pixabayData = await pixabayResponse.json();
@@ -70,7 +61,7 @@ serve(async (req) => {
     // If no suitable image found on Pixabay, use Hugging Face
     if (!imageUrl) {
       console.log('Generating image with Hugging Face for prompt:', prompt);
-      const hf = new HfInference(hfToken);
+      const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
 
       // Using a faster and more reliable model
       const image = await hf.textToImage({

@@ -8,6 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Use the provided API key
+const HUGGING_FACE_ACCESS_TOKEN = "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";
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -25,15 +28,9 @@ serve(async (req) => {
       throw new Error('Profile ID is required');
     }
 
-    const token = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-    if (!token) {
-      console.error('Hugging Face token not found');
-      throw new Error('API configuration error');
-    }
-
     console.log('Generating image for prompt:', prompt, 'Profile ID:', profileId);
 
-    const hf = new HfInference(token);
+    const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
     console.log('Created Hugging Face inference instance');
 
     // Using a faster and more reliable model
@@ -61,7 +58,7 @@ serve(async (req) => {
     console.log('Successfully converted image to base64');
 
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ imageUrl, source: 'huggingface' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

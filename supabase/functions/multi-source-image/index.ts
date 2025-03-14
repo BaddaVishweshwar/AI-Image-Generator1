@@ -30,21 +30,23 @@ serve(async (req) => {
     
     console.log('Generating image for prompt:', prompt, 'Profile ID:', profileId);
 
-    // Enhance prompt for better results
-    const enhancedPrompt = `high quality, detailed image of ${prompt}`;
-    console.log('Enhanced prompt for Hugging Face:', enhancedPrompt);
+    // Create a more detailed prompt to get better, more accurate results
+    const enhancedPrompt = `ultra realistic, high resolution, detailed, 8k, ${prompt}, professional photography, sharp focus, highly detailed, vivid colors`;
+    console.log('Enhanced prompt for image generation:', enhancedPrompt);
 
     const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
     console.log('Created Hugging Face inference instance');
 
-    // Using stable diffusion model for better quality and prompt relevance
+    // Using a better model for improved quality and relevance
     const image = await hf.textToImage({
       inputs: enhancedPrompt,
-      model: 'runwayml/stable-diffusion-v1-5',
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',  // Using SDXL for better quality
       parameters: {
-        negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution",
-        num_inference_steps: 30,  // Increased steps for better quality
-        guidance_scale: 7.5,      // Increased guidance scale for prompt adherence
+        negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution, boring, plain, unrealistic, cartoon",
+        num_inference_steps: 50,  // Increased steps for better quality
+        guidance_scale: 9.0,      // Increased guidance scale for stronger prompt adherence
+        width: 768,               // Larger image size
+        height: 768,              // Larger image size
       }
     });
 

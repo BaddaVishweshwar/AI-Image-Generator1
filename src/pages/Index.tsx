@@ -1,3 +1,4 @@
+
 import ImageGenerator from "@/components/ImageGenerator";
 import MainNav from "@/components/landing/MainNav";
 import SampleImages from "@/components/landing/SampleImages";

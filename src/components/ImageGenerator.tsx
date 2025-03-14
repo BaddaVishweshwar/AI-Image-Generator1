@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Clock, AlertTriangle } from "lucide-react";
+import { Download, Clock, AlertTriangle, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Progress } from "@/components/ui/progress";
@@ -26,6 +25,7 @@ const ImageGenerator = () => {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
+  const [imageSource, setImageSource] = useState<string | null>(null);
   const navigate = useNavigate();
   const { currentPlan, remainingGenerations, fetchCurrentPlan, fetchRemainingGenerations } = useSubscription();
 
@@ -138,7 +138,7 @@ const ImageGenerator = () => {
 
     setIsLoading(true);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('generate-image', {
+      const { data, error: functionError } = await supabase.functions.invoke('multi-source-image', {
         body: { prompt, profileId: profile.id }
       });
 
@@ -152,6 +152,7 @@ const ImageGenerator = () => {
       }
 
       setImageUrl(data.imageUrl);
+      setImageSource(data.source || null);
 
       if (!profile) {
         throw new Error("Profile not found. Please try logging out and back in.");
@@ -161,6 +162,7 @@ const ImageGenerator = () => {
         prompt,
         image_url: data.imageUrl,
         profile_id: profile.id,
+        source: data.source || 'multi-source'
       });
 
       if (insertError) {
@@ -187,7 +189,7 @@ const ImageGenerator = () => {
         }
       }
 
-      toast.success("Image generated and saved successfully!");
+      toast.success(`Image ${data.source === 'pixabay' ? 'found' : 'generated'} successfully!`);
     } catch (error: any) {
       console.error("Error generating image:", error);
       
@@ -349,8 +351,16 @@ const ImageGenerator = () => {
       {imageUrl && (
         <div className="rounded-lg overflow-hidden border">
           <img src={imageUrl} alt={prompt} className="w-full h-auto" />
-          <div className="p-4 bg-white border-t">
-            <Button onClick={handleDownload} className="w-full">
+          <div className="p-4 bg-white border-t flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              {imageSource && (
+                <span className="flex items-center">
+                  <ImageIcon className="h-4 w-4 mr-1" />
+                  Source: {imageSource === 'pixabay' ? 'Pixabay' : 'AI Generated'}
+                </span>
+              )}
+            </div>
+            <Button onClick={handleDownload}>
               <Download className="w-4 h-4 mr-2" />
               Download Image
             </Button>

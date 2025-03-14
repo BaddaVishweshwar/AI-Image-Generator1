@@ -35,21 +35,24 @@ serve(async (req) => {
     let imageSource = null;
     let imageUrl = null;
 
-    // Try Pixabay first
+    // Try Pixabay first with improved search terms
     try {
       console.log('Querying Pixabay API for:', prompt);
-      const searchTerms = prompt.split(" ").slice(0, 3).join("+"); // Use first 3 words for search
-      const pixabayUrl = `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(searchTerms)}&image_type=photo&per_page=3`;
       
+      // Use the full prompt for better search results
+      const cleanedPrompt = prompt.replace(/[^\w\s]/gi, ''); // Remove special characters
+      const pixabayUrl = `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(cleanedPrompt)}&image_type=photo&per_page=5&safesearch=true&order=relevance`;
+      
+      console.log('Pixabay search URL:', pixabayUrl);
       const pixabayResponse = await fetch(pixabayUrl);
       const pixabayData = await pixabayResponse.json();
       
       if (pixabayData.hits && pixabayData.hits.length > 0) {
-        // Select the first image from Pixabay
+        // Select the first (most relevant) image from Pixabay
         const image = pixabayData.hits[0];
         imageUrl = image.largeImageURL;
         imageSource = 'pixabay';
-        console.log('Found suitable image on Pixabay');
+        console.log('Found suitable image on Pixabay:', image.tags);
       } else {
         console.log('No suitable images found on Pixabay, falling back to Hugging Face');
       }
@@ -58,19 +61,23 @@ serve(async (req) => {
       console.log('Falling back to Hugging Face due to Pixabay error');
     }
 
-    // If no suitable image found on Pixabay, use Hugging Face
+    // If no suitable image found on Pixabay, use Hugging Face with enhanced prompt
     if (!imageUrl) {
       console.log('Generating image with Hugging Face for prompt:', prompt);
       const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
+      
+      // Enhance prompt for better results
+      const enhancedPrompt = `high quality, detailed image of ${prompt}`;
+      console.log('Enhanced prompt for Hugging Face:', enhancedPrompt);
 
-      // Using a faster and more reliable model
+      // Using stable diffusion model for better quality and prompt relevance
       const image = await hf.textToImage({
-        inputs: prompt,
+        inputs: enhancedPrompt,
         model: 'runwayml/stable-diffusion-v1-5',
         parameters: {
-          negative_prompt: "blurry, bad quality, distorted",
-          num_inference_steps: 20,
-          guidance_scale: 7,
+          negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution",
+          num_inference_steps: 30,  // Increased steps for better quality
+          guidance_scale: 7.5,      // Increased guidance scale for prompt adherence
         }
       });
 

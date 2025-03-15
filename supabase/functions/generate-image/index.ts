@@ -37,24 +37,31 @@ serve(async (req) => {
     const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
     console.log('Created Hugging Face inference instance');
 
-    // Using FLUX.1 model which was previously working
-    const image = await hf.textToImage({
-      inputs: enhancedPrompt,
-      model: 'black-forest-labs/FLUX.1',
-      parameters: {
-        negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution, boring, plain",
-        num_inference_steps: 40,
-      }
+    // Directly call the FLUX.1 model with new parameters
+    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HUGGING_FACE_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        inputs: enhancedPrompt,
+        parameters: {
+          negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution",
+          num_inference_steps: 30,
+          guidance_scale: 7.5
+        }
+      })
     });
 
-    if (!image) {
-      throw new Error('No image was generated');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Hugging Face API error:', response.status, errorText);
+      throw new Error(`Hugging Face API error: ${response.status} ${errorText}`);
     }
 
-    console.log('Image generated successfully, converting to base64');
-
-    // Convert the blob to base64 string
-    const arrayBuffer = await image.arrayBuffer();
+    // Get image from response
+    const arrayBuffer = await response.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     const imageUrl = `data:image/png;base64,${base64}`;
 

@@ -26,16 +26,31 @@ const ImageGenerator = () => {
   const [profile, setProfile] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const [imageSource, setImageSource] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<boolean>(false);
   const navigate = useNavigate();
   const { currentPlan, remainingGenerations, fetchCurrentPlan, fetchRemainingGenerations } = useSubscription();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    const checkSession = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      
+      if (!currentSession) {
+        setAuthError(true);
+      } else {
+        setAuthError(false);
+      }
+    };
+
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (!session) {
+        setAuthError(true);
+      } else {
+        setAuthError(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -45,14 +60,23 @@ const ImageGenerator = () => {
     const fetchProfile = async () => {
       if (!session?.user?.id) return;
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .single();
+      try {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .single();
 
-      if (profileData) {
-        setProfile(profileData);
+        if (error) {
+          console.error('Error fetching profile:', error);
+          return;
+        }
+
+        if (profileData) {
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error in profile fetch:', error);
       }
     };
 
@@ -119,14 +143,19 @@ const ImageGenerator = () => {
   };
 
   const handleGenerate = async () => {
-    if (!session) {
-      toast.error("Please log in to generate images");
+    if (authError || !session) {
+      toast.error("Authentication error. Please log in again.");
       navigate("/auth");
       return;
     }
 
     if (!prompt) {
       toast.error("Please enter a prompt");
+      return;
+    }
+
+    if (!profile?.id) {
+      toast.error("Profile not found. Please try logging out and back in.");
       return;
     }
 
@@ -154,10 +183,6 @@ const ImageGenerator = () => {
       setImageUrl(data.imageUrl);
       setImageSource(data.source || null);
 
-      if (!profile) {
-        throw new Error("Profile not found. Please try logging out and back in.");
-      }
-
       const { error: insertError } = await supabase.from("images").insert({
         prompt,
         image_url: data.imageUrl,
@@ -170,7 +195,6 @@ const ImageGenerator = () => {
         throw new Error('Failed to save image');
       }
 
-      // Update generation count for free tier users
       if (currentPlan?.tier === 'free') {
         try {
           const { error: incrementError } = await supabase.rpc('increment_generation_count', { 
@@ -182,7 +206,6 @@ const ImageGenerator = () => {
             throw new Error(`Failed to update generation count: ${incrementError.message}`);
           }
           
-          // Refresh the remaining generations after a successful generation and count update
           await fetchRemainingGenerations(profile.id);
         } catch (error: any) {
           console.error("Error updating generation count:", error);
@@ -193,7 +216,11 @@ const ImageGenerator = () => {
     } catch (error: any) {
       console.error("Error generating image:", error);
       
-      if (error.message.includes('429')) {
+      if (error.message?.includes('401') || error.message?.includes('auth') || error.message?.includes('token')) {
+        toast.error("Authentication error. Please log in again.");
+        setAuthError(true);
+        navigate("/auth");
+      } else if (error.message.includes('429')) {
         toast.error("Please wait 2 minutes before generating another image. This helps ensure fair usage for everyone.");
       } else if (error.message.includes('busy')) {
         toast.error("The AI service is currently busy. Please try again in a few minutes.");
@@ -222,6 +249,20 @@ const ImageGenerator = () => {
     
     return false;
   };
+
+  if (authError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Authentication Error</h2>
+          <p className="text-muted-foreground mb-4">
+            Your session has expired or is invalid. Please log in again.
+          </p>
+          <Button onClick={() => navigate("/auth")}>Log In</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (

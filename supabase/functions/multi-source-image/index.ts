@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,23 +30,18 @@ serve(async (req) => {
     console.log('Generating image for prompt:', prompt, 'Profile ID:', profileId);
 
     // Create a more detailed prompt to get better, more accurate results
-    const enhancedPrompt = `ultra realistic, high resolution, detailed, ${prompt}, professional photography, sharp focus, highly detailed, vivid colors`;
+    const enhancedPrompt = `high quality, detailed, ${prompt}`;
     console.log('Enhanced prompt for image generation:', enhancedPrompt);
 
-    // Directly call the Stable Diffusion XL model which should be more reliable
-    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {
+    // Use Stable Diffusion v2.1 model which is more reliable
+    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${HUGGING_FACE_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        inputs: enhancedPrompt,
-        parameters: {
-          negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution",
-          num_inference_steps: 30,
-          guidance_scale: 7.5
-        }
+        inputs: enhancedPrompt
       })
     });
 

@@ -37,10 +37,10 @@ serve(async (req) => {
     const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
     console.log('Created Hugging Face inference instance');
 
-    // Using black-forest-labs/flux-1 model as requested
+    // Using FLUX.1-schnell model which is actually available on Hugging Face
     const image = await hf.textToImage({
       inputs: enhancedPrompt,
-      model: 'black-forest-labs/flux-1',
+      model: 'black-forest-labs/FLUX.1-schnell',
       parameters: {
         negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution, boring, plain",
         num_inference_steps: 40,

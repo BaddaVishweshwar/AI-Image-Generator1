@@ -31,22 +31,19 @@ serve(async (req) => {
     console.log('Generating image for prompt:', prompt, 'Profile ID:', profileId);
 
     // Create a more detailed prompt to get better, more accurate results
-    const enhancedPrompt = `ultra realistic, high resolution, detailed, 8k, ${prompt}, professional photography, sharp focus, highly detailed, vivid colors`;
+    const enhancedPrompt = `ultra realistic, high resolution, detailed, ${prompt}, professional photography`;
     console.log('Enhanced prompt for image generation:', enhancedPrompt);
 
     const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN);
     console.log('Created Hugging Face inference instance');
 
-    // Using a better model for improved quality and relevance
+    // Using black-forest-labs/flux-1 model as requested
     const image = await hf.textToImage({
       inputs: enhancedPrompt,
-      model: 'stabilityai/stable-diffusion-xl-base-1.0',  // Using SDXL for better quality
+      model: 'black-forest-labs/flux-1',
       parameters: {
-        negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution, boring, plain, unrealistic, cartoon",
-        num_inference_steps: 50,  // Increased steps for better quality
-        guidance_scale: 9.0,      // Increased guidance scale for stronger prompt adherence
-        width: 768,               // Larger image size
-        height: 768,              // Larger image size
+        negative_prompt: "blurry, bad quality, distorted, deformed, ugly, low resolution, boring, plain",
+        num_inference_steps: 40,
       }
     });
 

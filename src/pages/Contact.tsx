@@ -1,3 +1,4 @@
+
 import MainNav from "@/components/landing/MainNav";
 import { Mail, Phone, User, MessageSquare } from "lucide-react";
 
@@ -15,11 +16,15 @@ const Contact = () => {
           <h2 className="text-xl font-semibold mb-6 text-purple-700">Get in Touch:</h2>
           
           <div className="space-y-6">
-            <div className="flex items-center space-x-4 text-gray-700">
-              <User className="w-6 h-6 text-purple-600" />
+            <div className="flex items-start space-x-4 text-gray-700">
+              <User className="w-6 h-6 text-purple-600 mt-1" />
               <div>
-                <p className="font-semibold">Founder & CEO:</p>
-                <p>Badda Vishweshwar</p>
+                <p className="font-semibold">Dedicated Team:</p>
+                <ul className="list-none space-y-1">
+                  <li>Eshwar Naidu</li>
+                  <li>Chetan Macha</li>
+                  <li>Manas</li>
+                </ul>
               </div>
             </div>
             

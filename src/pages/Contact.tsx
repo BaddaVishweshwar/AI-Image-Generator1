@@ -21,6 +21,7 @@ const Contact = () => {
               <div>
                 <p className="font-semibold">Dedicated Team:</p>
                 <ul className="list-none space-y-1">
+                  <li>Vishweshwar</li>
                   <li>Eshwar Naidu</li>
                   <li>Chetan Macha</li>
                   <li>Manas</li>

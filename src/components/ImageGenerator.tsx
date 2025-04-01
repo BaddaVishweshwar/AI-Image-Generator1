@@ -32,13 +32,22 @@ const ImageGenerator = () => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      
-      if (!currentSession) {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+        
+        if (!currentSession) {
+          setAuthError(true);
+          // Clear the wasLoggedIn flag if no session is found
+          localStorage.removeItem('wasLoggedIn');
+        } else {
+          setAuthError(false);
+          // Set a flag in localStorage to track if user was logged in
+          localStorage.setItem('wasLoggedIn', 'true');
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
         setAuthError(true);
-      } else {
-        setAuthError(false);
       }
     };
 
@@ -48,13 +57,18 @@ const ImageGenerator = () => {
       setSession(session);
       if (!session) {
         setAuthError(true);
+        // Only redirect to auth if user was previously logged in
+        if (localStorage.getItem('wasLoggedIn') === 'true') {
+          navigate("/auth");
+        }
       } else {
         setAuthError(false);
+        localStorage.setItem('wasLoggedIn', 'true');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -167,6 +181,8 @@ const ImageGenerator = () => {
 
     setIsLoading(true);
     try {
+      console.log("Calling multi-source-image function with:", { prompt, profileId: profile.id });
+      
       const { data, error: functionError } = await supabase.functions.invoke('multi-source-image', {
         body: { prompt, profileId: profile.id }
       });
@@ -220,10 +236,12 @@ const ImageGenerator = () => {
         toast.error("Authentication error. Please log in again.");
         setAuthError(true);
         navigate("/auth");
-      } else if (error.message.includes('429')) {
+      } else if (error.message?.includes('429')) {
         toast.error("Please wait 2 minutes before generating another image. This helps ensure fair usage for everyone.");
-      } else if (error.message.includes('busy')) {
+      } else if (error.message?.includes('busy')) {
         toast.error("The AI service is currently busy. Please try again in a few minutes.");
+      } else if (error.message?.includes('503') || error.message?.includes('Service Unavailable')) {
+        toast.error("The AI service is currently unavailable. Please try again in a few minutes.");
       } else {
         toast.error(error.message || "Failed to generate image. Please try again.");
       }

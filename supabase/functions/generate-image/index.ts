@@ -33,30 +33,54 @@ serve(async (req) => {
     const enhancedPrompt = `high quality, detailed, ${prompt}`;
     console.log('Enhanced prompt:', enhancedPrompt);
 
-    // Use Stable Diffusion v2.1 model which is more reliable
-    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${HUGGING_FACE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        inputs: enhancedPrompt
-      })
-    });
+    // Create a function to handle retries
+    const generateImage = async (retries = 2) => {
+      try {
+        // Try Stable Diffusion 2.1 (reliable and fast)
+        const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${HUGGING_FACE_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            inputs: enhancedPrompt
+          })
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Hugging Face API error:', response.status, errorText);
-      throw new Error(`Hugging Face API error: ${response.status} ${errorText}`);
-    }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Hugging Face API error:', response.status, errorText);
+          
+          if (response.status === 503 && retries > 0) {
+            console.log(`Service unavailable, retrying... (${retries} left)`);
+            // Wait 2 seconds before retrying
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return await generateImage(retries - 1);
+          }
+          
+          throw new Error(`Hugging Face API error: ${response.status} ${errorText}`);
+        }
 
-    // Get image from response
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    const imageUrl = `data:image/png;base64,${base64}`;
+        // Get image from response
+        const arrayBuffer = await response.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const imageUrl = `data:image/png;base64,${base64}`;
 
-    console.log('Successfully converted image to base64');
+        console.log('Successfully converted image to base64');
+        return imageUrl;
+      } catch (error) {
+        if (retries > 0) {
+          console.log(`Error encountered, retrying... (${retries} left):`, error);
+          // Wait 2 seconds before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return await generateImage(retries - 1);
+        }
+        throw error;
+      }
+    };
+
+    const imageUrl = await generateImage();
 
     return new Response(
       JSON.stringify({ imageUrl, source: 'huggingface' }),
@@ -78,6 +102,9 @@ serve(async (req) => {
     } else if (error.message?.includes('model not found')) {
       statusCode = 404;
       errorMessage = 'The AI model could not be loaded. Please try again.';
+    } else if (error.message?.includes('Service Unavailable') || error.message?.includes('503')) {
+      statusCode = 503;
+      errorMessage = 'The AI service is currently unavailable. Please try again in a few minutes.';
     }
     
     return new Response(
